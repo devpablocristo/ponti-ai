@@ -51,3 +51,14 @@ class ActionResponse(BaseModel):
 
 class JobRecomputeRequest(BaseModel):
     batch_size: int | None = None
+
+
+class JobRecomputeBaselinesRequest(BaseModel):
+    batch_size: int | None = None
+
+
+class JobRecomputeBaselinesResponse(BaseModel):
+    status: str
+    job_run_id: str
+    cohort_saved: int
+    project_saved: int

@@ -33,13 +33,22 @@ services:
       - APP_NAME=ai-copilot-service
       - APP_ENV=local
       - DB_DSN=postgresql://postgres:postgres@ai-db:5432/ai_copilot?sslmode=disable
-      - AI_API_KEYS=abc123secreta
+      - AI_SERVICE_KEYS=servicekey123
       - STATEMENT_TIMEOUT_MS=2000
       - MAX_LIMIT=200
       - DEFAULT_LIMIT=50
       - EMBEDDING_DIM=1536
       - RAG_TOP_K=5
       - LLM_PROVIDER=stub
+      - INSIGHTS_RATIO_HIGH=0.5
+      - INSIGHTS_RATIO_MEDIUM=0.2
+      - INSIGHTS_SIZE_SMALL_MAX=200
+      - INSIGHTS_SIZE_MEDIUM_MAX=1000
+      - INSIGHTS_PROJECT_BASELINE_DAYS=365
+      - INSIGHTS_MIN_SAMPLES_PROJECT=10
+      - INSIGHTS_BASELINE_LOCK_KEY=41001
+      - INSIGHTS_RECOMPUTE_LOCK_KEY=41002
+      - INSIGHTS_BASELINE_BATCH_SIZE=200
     ports:
       - "8090:8090"
 

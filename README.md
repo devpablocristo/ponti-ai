@@ -1,6 +1,6 @@
 TLDR:
 1. `cp .env.example .env`
-2. Configurar `AI_API_KEYS` en `.env`
+2. Configurar `AI_SERVICE_KEYS` y ratios de insights en `.env`
 3. `make up`
 4. `make run`
 
@@ -40,10 +40,15 @@ make run
 
 ## Headers requeridos
 ```
-X-API-KEY: abc123secreta
+X-SERVICE-KEY: servicekey123
 X-USER-ID: 123
 X-PROJECT-ID: demo-project
 ```
+
+## Insights (baseline)
+Las alertas comparan el valor del proyecto contra el promedio global usando ratios:
+- `INSIGHTS_RATIO_HIGH` (anomaly)
+- `INSIGHTS_RATIO_MEDIUM` (recommendation)
 
 ## Arquitectura (hexagonal liviana)
 - `domain/`: entidades y value objects
@@ -64,7 +69,7 @@ curl -s http://localhost:8090/readyz
 ```bash
 curl -s -X POST http://localhost:8090/v1/ask \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: abc123secreta" \
+  -H "X-SERVICE-KEY: servicekey123" \
   -H "X-USER-ID: 123" \
   -H "X-PROJECT-ID: demo-project" \
   -d '{
@@ -76,7 +81,7 @@ curl -s -X POST http://localhost:8090/v1/ask \
 ```bash
 curl -s -X POST http://localhost:8090/v1/rag/ingest \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: abc123secreta" \
+  -H "X-SERVICE-KEY: servicekey123" \
   -H "X-USER-ID: 123" \
   -H "X-PROJECT-ID: demo-project" \
   -d '{
@@ -89,14 +94,14 @@ curl -s -X POST http://localhost:8090/v1/rag/ingest \
 ```bash
 curl -s -X POST http://localhost:8090/v1/insights/compute \
   -H "Content-Type: application/json" \
-  -H "X-API-KEY: abc123secreta" \
+  -H "X-SERVICE-KEY: servicekey123" \
   -H "X-USER-ID: 123" \
   -H "X-PROJECT-ID: demo-project"
 ```
 
 ```bash
 curl -s http://localhost:8090/v1/insights/summary \
-  -H "X-API-KEY: abc123secreta" \
+  -H "X-SERVICE-KEY: servicekey123" \
   -H "X-USER-ID: 123" \
   -H "X-PROJECT-ID: demo-project"
 ```
@@ -110,7 +115,7 @@ El FE puede usar `GET /v1/insights/summary` para obtener:
 ## Cloud Scheduler (ejemplo)
 ```bash
 curl -s -X POST http://localhost:8090/v1/jobs/recompute-active \
-  -H "X-API-KEY: abc123secreta" \
+  -H "X-SERVICE-KEY: servicekey123" \
   -H "X-USER-ID: scheduler" \
   -H "X-PROJECT-ID: demo-project" \
   -d '{ "batch_size": 100 }'

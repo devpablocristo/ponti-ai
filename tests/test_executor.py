@@ -15,6 +15,15 @@ def test_executor_requires_dsn() -> None:
         embedding_dim=8,
         rag_top_k=3,
         llm_provider="stub",
+        insights_ratio_high=0.5,
+        insights_ratio_medium=0.2,
+        insights_size_small_max=200,
+        insights_size_medium_max=1000,
+        insights_project_baseline_days=365,
+        insights_min_samples_project=10,
+        insights_baseline_lock_key=41001,
+        insights_recompute_lock_key=41002,
+        insights_baseline_batch_size=200,
     )
     executor = SQLExecutor(settings)
     with pytest.raises(ValueError):

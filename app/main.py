@@ -7,11 +7,15 @@ from adapters.inbound.api.routes.health import router as health_router
 from adapters.inbound.api.routes.insights import router as insights_router
 from adapters.inbound.api.routes.jobs import router as jobs_router
 from adapters.outbound.db.repos.audit_logger_pg import AuditLoggerPG
+from adapters.outbound.db.job_lock_pg import JobLockPG
+from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
 from adapters.outbound.db.repos.rag_repo_pg import RagRepositoryPG
 from adapters.outbound.models.anomaly_runner import AnomalyRunner
 from adapters.outbound.models.intent_classifier import IntentClassifier
+from adapters.outbound.sql.baseline_computer_pg import BaselineComputerPG
+from adapters.outbound.sql.project_repo_pg import ProjectRepositoryPG
 from adapters.outbound.sql.catalog_adapter import SQLCatalogAdapter
 from adapters.outbound.sql.executor import SQLExecutor
 from app.config import load_settings
@@ -22,6 +26,7 @@ from application.insights.use_cases.get_insights import GetInsights
 from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
 from application.insights.use_cases.recompute_active import RecomputeActive
+from application.insights.use_cases.recompute_baselines import RecomputeBaselines
 
 
 def create_app() -> FastAPI:
@@ -46,12 +51,21 @@ def create_app() -> FastAPI:
 
     feature_repo = FeatureRepositoryPG(settings)
     insight_repo = InsightRepositoryPG(settings)
-    model_runner = AnomalyRunner()
+    model_runner = AnomalyRunner(
+        ratio_high=settings.insights_ratio_high,
+        ratio_medium=settings.insights_ratio_medium,
+    )
     compute_insights = ComputeInsights(feature_repo, model_runner, insight_repo, audit_logger)
     get_insights = GetInsights(insight_repo)
     get_summary = GetSummary(insight_repo)
     record_action = RecordAction(insight_repo, audit_logger)
-    recompute_active = RecomputeActive(compute_insights, insight_repo)
+
+    baseline_repo = BaselineRepositoryPG(settings)
+    baseline_computer = BaselineComputerPG(settings)
+    project_repo = ProjectRepositoryPG(settings)
+    job_lock = JobLockPG(settings)
+    recompute_active = RecomputeActive(compute_insights, insight_repo, job_lock)
+    recompute_baselines = RecomputeBaselines(baseline_computer, baseline_repo, project_repo, job_lock)
 
     container = AppContainer(
         settings=settings,
@@ -62,6 +76,7 @@ def create_app() -> FastAPI:
         get_summary=get_summary,
         record_action=record_action,
         recompute_active=recompute_active,
+        recompute_baselines=recompute_baselines,
     )
 
     app = FastAPI(title="AI Copilot Service", version="0.2.0")

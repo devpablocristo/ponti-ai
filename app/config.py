@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+from application.insights.ports.baseline_computer import CohortConfig
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -23,6 +25,26 @@ class Settings:
     # LLM
     llm_provider: str
 
+    # Insights
+    insights_ratio_high: float
+    insights_ratio_medium: float
+
+    # Baselines y jobs
+    insights_size_small_max: float
+    insights_size_medium_max: float
+    insights_project_baseline_days: int
+    insights_min_samples_project: int
+    insights_baseline_lock_key: int
+    insights_recompute_lock_key: int
+    insights_baseline_batch_size: int
+
+    @property
+    def cohort_config(self) -> CohortConfig:
+        return CohortConfig(
+            size_small_max=self.insights_size_small_max,
+            size_medium_max=self.insights_size_medium_max,
+        )
+
 
 def _get_required(name: str) -> str:
     value = os.getenv(name, "").strip()
@@ -39,6 +61,14 @@ def _get_required_int(name: str) -> int:
         raise ValueError(f"{name} debe ser numerico") from exc
 
 
+def _get_required_float(name: str) -> float:
+    raw = _get_required(name)
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} debe ser numerico") from exc
+
+
 def load_settings() -> Settings:
     return Settings(
         app_name=_get_required("APP_NAME"),
@@ -50,4 +80,13 @@ def load_settings() -> Settings:
         embedding_dim=_get_required_int("EMBEDDING_DIM"),
         rag_top_k=_get_required_int("RAG_TOP_K"),
         llm_provider=_get_required("LLM_PROVIDER"),
+        insights_ratio_high=_get_required_float("INSIGHTS_RATIO_HIGH"),
+        insights_ratio_medium=_get_required_float("INSIGHTS_RATIO_MEDIUM"),
+        insights_size_small_max=_get_required_float("INSIGHTS_SIZE_SMALL_MAX"),
+        insights_size_medium_max=_get_required_float("INSIGHTS_SIZE_MEDIUM_MAX"),
+        insights_project_baseline_days=_get_required_int("INSIGHTS_PROJECT_BASELINE_DAYS"),
+        insights_min_samples_project=_get_required_int("INSIGHTS_MIN_SAMPLES_PROJECT"),
+        insights_baseline_lock_key=_get_required_int("INSIGHTS_BASELINE_LOCK_KEY"),
+        insights_recompute_lock_key=_get_required_int("INSIGHTS_RECOMPUTE_LOCK_KEY"),
+        insights_baseline_batch_size=_get_required_int("INSIGHTS_BASELINE_BATCH_SIZE"),
     )

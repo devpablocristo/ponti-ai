@@ -235,6 +235,157 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
         max_limit=50,
         implemented=True,
     ),
+    "baseline_cost_total": SQLCatalogEntry(
+        query_id="baseline_cost_total",
+        description="Baseline costo total estimado (promedio entre proyectos).",
+        sql_template=(
+            "WITH per_project AS ("
+            "  SELECT w.project_id, COALESCE(SUM(l.price), 0) AS value "
+            "  FROM public.workorders w "
+            "  JOIN public.labors l ON l.id = w.labor_id "
+            "  GROUP BY w.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'cost_total'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
+    "baseline_cost_per_ha": SQLCatalogEntry(
+        query_id="baseline_cost_per_ha",
+        description="Baseline costo por hectarea (promedio entre proyectos).",
+        sql_template=(
+            "WITH total_cost AS ("
+            "  SELECT w.project_id, COALESCE(SUM(l.price), 0) AS cost "
+            "  FROM public.workorders w "
+            "  JOIN public.labors l ON l.id = w.labor_id "
+            "  GROUP BY w.project_id"
+            "), total_ha AS ("
+            "  SELECT f.project_id, COALESCE(SUM(lo.hectares), 0) AS hectares "
+            "  FROM public.fields f "
+            "  JOIN public.lots lo ON lo.field_id = f.id "
+            "  GROUP BY f.project_id"
+            "), per_project AS ("
+            "  SELECT tc.project_id, COALESCE(tc.cost / NULLIF(th.hectares, 0), 0) AS value "
+            "  FROM total_cost tc "
+            "  JOIN total_ha th ON th.project_id = tc.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'cost_per_ha'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
+    "baseline_inputs_usage": SQLCatalogEntry(
+        query_id="baseline_inputs_usage",
+        description="Baseline uso de insumos (promedio entre proyectos).",
+        sql_template=(
+            "WITH per_project AS ("
+            "  SELECT w.project_id, COALESCE(SUM(i.total_used), 0) AS value "
+            "  FROM public.workorders w "
+            "  JOIN public.workorder_items i ON i.workorder_id = w.id "
+            "  GROUP BY w.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'inputs_total_used'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
+    "baseline_workorders_count": SQLCatalogEntry(
+        query_id="baseline_workorders_count",
+        description="Baseline cantidad de ordenes (promedio entre proyectos).",
+        sql_template=(
+            "WITH per_project AS ("
+            "  SELECT w.project_id, COUNT(*) AS value "
+            "  FROM public.workorders w "
+            "  GROUP BY w.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'workorders_count'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
+    "baseline_stock_variance": SQLCatalogEntry(
+        query_id="baseline_stock_variance",
+        description="Baseline variacion de stock (promedio entre proyectos).",
+        sql_template=(
+            "WITH per_project AS ("
+            "  SELECT s.project_id, COALESCE(SUM(s.real_stock_units - s.initial_units), 0) AS value "
+            "  FROM public.stocks s "
+            "  GROUP BY s.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'stock_variance'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
+    "baseline_total_hectares": SQLCatalogEntry(
+        query_id="baseline_total_hectares",
+        description="Baseline hectareas totales (promedio entre proyectos).",
+        sql_template=(
+            "WITH per_project AS ("
+            "  SELECT f.project_id, COALESCE(SUM(lo.hectares), 0) AS value "
+            "  FROM public.fields f "
+            "  JOIN public.lots lo ON lo.field_id = f.id "
+            "  GROUP BY f.project_id"
+            ") "
+            "SELECT %(project_id)s::text AS project_id, "
+            "'baseline'::text AS entity_type, "
+            "'all'::text AS entity_id, "
+            "'total_hectares'::text AS feature_name, "
+            "COALESCE(AVG(value), 0)::float AS value "
+            "FROM per_project "
+            "WHERE %(project_id)s IS NOT NULL "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=1,
+        implemented=True,
+    ),
 }
 
 
