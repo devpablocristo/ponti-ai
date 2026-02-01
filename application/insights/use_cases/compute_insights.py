@@ -1,5 +1,7 @@
 import time
 import uuid
+from dataclasses import replace
+from datetime import datetime, timezone
 
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.insights.ports.feature_repository import FeatureRepositoryPort
@@ -20,7 +22,13 @@ class ComputeInsights:
         self.insight_repo = insight_repo
         self.audit_logger = audit_logger
 
-    def handle(self, project_id: str, user_id: str) -> dict[str, int | str]:
+    def handle(
+        self,
+        project_id: str,
+        user_id: str,
+        computed_by: str = "on_demand",
+        job_run_id: str | None = None,
+    ) -> dict[str, int | str]:
         request_id = str(uuid.uuid4())
         started = time.time()
         status = "ok"
@@ -32,7 +40,26 @@ class ComputeInsights:
             features = self.feature_repo.fetch_features(project_id)
             computed = len(features)
             insights = self.model_runner.compute(project_id, features)
-            created = self.insight_repo.upsert_many(insights)
+            now = datetime.now(timezone.utc)
+            filtered: list = []
+            for insight in insights:
+                if insight.dedupe_key:
+                    existing = self.insight_repo.get_active_by_dedupe(
+                        project_id=project_id,
+                        entity_type=insight.entity_type,
+                        entity_id=insight.entity_id,
+                        dedupe_key=insight.dedupe_key,
+                    )
+                    if existing and existing.cooldown_until and existing.cooldown_until > now:
+                        continue
+                filtered.append(
+                    replace(
+                        insight,
+                        computed_by=computed_by,
+                        job_run_id=job_run_id,
+                    )
+                )
+            created = self.insight_repo.upsert_many(filtered)
         except Exception as exc:  # noqa: BLE001
             status = "error"
             error = str(exc)

@@ -8,6 +8,7 @@ class FeatureValue:
     entity_type: str
     entity_id: str
     feature_name: str
+    window: str
     value: float
 
 

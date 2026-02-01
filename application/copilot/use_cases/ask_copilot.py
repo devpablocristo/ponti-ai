@@ -5,6 +5,7 @@ from typing import Any
 
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.copilot.ports.intent_classifier import IntentClassifierPort
+from application.copilot.ports.insight_reader import InsightReaderPort, RelatedInsight
 from application.copilot.ports.rag_repository import RagRepositoryPort
 from application.copilot.ports.sql_catalog import SQLCatalogPort
 from application.copilot.ports.sql_executor import SQLExecutorPort
@@ -21,6 +22,8 @@ class AskResult:
     answer: str
     sources: list[dict[str, Any]]
     warnings: list[str]
+    related_insights_count: int
+    related_insights: list[RelatedInsight]
 
 
 class AskCopilot:
@@ -32,6 +35,7 @@ class AskCopilot:
         sql_executor: SQLExecutorPort,
         rag_repo: RagRepositoryPort,
         audit_logger: AuditLoggerPort,
+        insight_reader: InsightReaderPort,
     ) -> None:
         self.settings = settings
         self.intent_classifier = intent_classifier
@@ -39,6 +43,7 @@ class AskCopilot:
         self.sql_executor = sql_executor
         self.rag_repo = rag_repo
         self.audit_logger = audit_logger
+        self.insight_reader = insight_reader
 
     def handle(
         self,
@@ -109,6 +114,8 @@ class AskCopilot:
                 )
             )
 
+            related_count = self.insight_reader.count_active(project_id)
+            related_items = self.insight_reader.list_active(project_id, limit=3)
             return AskResult(
                 request_id=request_id,
                 intent=intent,
@@ -118,6 +125,8 @@ class AskCopilot:
                 answer=answer,
                 sources=sources,
                 warnings=warnings,
+                related_insights_count=related_count,
+                related_insights=related_items,
             )
         except Exception as exc:  # noqa: BLE001
             duration_ms = int((time.time() - started) * 1000)
@@ -145,4 +154,6 @@ class AskCopilot:
                 answer="Error procesando la consulta.",
                 sources=sources,
                 warnings=warnings + [str(exc)],
+                related_insights_count=0,
+                related_insights=[],
             )

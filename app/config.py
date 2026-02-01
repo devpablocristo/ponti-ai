@@ -28,6 +28,10 @@ class Settings:
     # Insights
     insights_ratio_high: float
     insights_ratio_medium: float
+    insights_spike_ratio: float
+    insights_cooldown_days: int
+    insights_impact_k: float
+    insights_impact_cap: float
 
     # Baselines y jobs
     insights_size_small_max: float
@@ -82,6 +86,10 @@ def load_settings() -> Settings:
         llm_provider=_get_required("LLM_PROVIDER"),
         insights_ratio_high=_get_required_float("INSIGHTS_RATIO_HIGH"),
         insights_ratio_medium=_get_required_float("INSIGHTS_RATIO_MEDIUM"),
+        insights_spike_ratio=_get_required_float("INSIGHTS_SPIKE_RATIO"),
+        insights_cooldown_days=_get_required_int("INSIGHTS_COOLDOWN_DAYS"),
+        insights_impact_k=_get_required_float("INSIGHTS_IMPACT_K"),
+        insights_impact_cap=_get_required_float("INSIGHTS_IMPACT_CAP"),
         insights_size_small_max=_get_required_float("INSIGHTS_SIZE_SMALL_MAX"),
         insights_size_medium_max=_get_required_float("INSIGHTS_SIZE_MEDIUM_MAX"),
         insights_project_baseline_days=_get_required_int("INSIGHTS_PROJECT_BASELINE_DAYS"),

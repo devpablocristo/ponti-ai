@@ -21,12 +21,18 @@ class FeatureRepositoryPG(FeatureRepositoryPort):
                 default_limit=self.settings.default_limit,
             )
             for row in rows:
+                window = "all"
+                if entry.query_id.endswith("_last_30d"):
+                    window = "last_30d"
+                elif entry.query_id.endswith("_last_7d"):
+                    window = "last_7d"
                 features.append(
                     FeatureValue(
                         project_id=row.get("project_id", project_id),
                         entity_type=row.get("entity_type", "project"),
                         entity_id=row.get("entity_id", project_id),
                         feature_name=row.get("feature_name", entry.query_id),
+                        window=window,
                         value=float(row.get("value", 0.0)),
                     )
                 )

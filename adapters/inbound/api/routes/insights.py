@@ -77,6 +77,15 @@ def get_insights(
             computed_at=insight.computed_at.isoformat(),
             valid_until=insight.valid_until.isoformat(),
             status=insight.status,
+            impact_min=insight.impact_min,
+            impact_max=insight.impact_max,
+            impact_unit=insight.impact_unit,
+            confidence=insight.confidence,
+            dedupe_key=insight.dedupe_key,
+            cooldown_until=insight.cooldown_until.isoformat() if insight.cooldown_until else None,
+            computed_by=insight.computed_by,
+            job_run_id=insight.job_run_id,
+            rules_version=insight.rules_version,
         )
         for insight in insights
     ]
@@ -122,6 +131,15 @@ def get_summary(
             computed_at=insight.computed_at.isoformat(),
             valid_until=insight.valid_until.isoformat(),
             status=insight.status,
+            impact_min=insight.impact_min,
+            impact_max=insight.impact_max,
+            impact_unit=insight.impact_unit,
+            confidence=insight.confidence,
+            dedupe_key=insight.dedupe_key,
+            cooldown_until=insight.cooldown_until.isoformat() if insight.cooldown_until else None,
+            computed_by=insight.computed_by,
+            job_run_id=insight.job_run_id,
+            rules_version=insight.rules_version,
         )
         for insight in summary.top_insights
     ]

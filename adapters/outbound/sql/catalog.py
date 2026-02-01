@@ -108,17 +108,15 @@ _COPILOT_CATALOG: dict[str, SQLCatalogEntry] = {
 _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
     "feature_cost_total": SQLCatalogEntry(
         query_id="feature_cost_total",
-        description="Costo total estimado por proyecto (labores).",
+        description="Costos directos ejecutados por proyecto.",
         sql_template=(
-            "SELECT w.project_id::text AS project_id, "
+            "SELECT project_id::text AS project_id, "
             "'project'::text AS entity_type, "
-            "w.project_id::text AS entity_id, "
+            "project_id::text AS entity_id, "
             "'cost_total'::text AS feature_name, "
-            "COALESCE(SUM(l.price), 0)::float AS value "
-            "FROM public.workorders w "
-            "JOIN public.labors l ON l.id = w.labor_id "
-            "WHERE w.project_id = %(project_id)s "
-            "GROUP BY w.project_id "
+            "COALESCE(costos_directos_ejecutados_usd, 0)::float AS value "
+            "FROM v4_report.dashboard_management_balance "
+            "WHERE project_id = %(project_id)s "
             "LIMIT %(limit)s"
         ),
         params_model=ProjectScopeParams,
@@ -128,28 +126,15 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
     ),
     "feature_cost_per_ha": SQLCatalogEntry(
         query_id="feature_cost_per_ha",
-        description="Costo estimado por hectarea (labores / hectareas).",
+        description="Costo directo por hectarea (proyecto).",
         sql_template=(
-            "WITH total_cost AS ("
-            "  SELECT w.project_id, COALESCE(SUM(l.price), 0) AS cost "
-            "  FROM public.workorders w "
-            "  JOIN public.labors l ON l.id = w.labor_id "
-            "  WHERE w.project_id = %(project_id)s "
-            "  GROUP BY w.project_id"
-            "), total_ha AS ("
-            "  SELECT f.project_id, COALESCE(SUM(lo.hectares), 0) AS hectares "
-            "  FROM public.fields f "
-            "  JOIN public.lots lo ON lo.field_id = f.id "
-            "  WHERE f.project_id = %(project_id)s "
-            "  GROUP BY f.project_id"
-            ") "
             "SELECT %(project_id)s::text AS project_id, "
             "'project'::text AS entity_type, "
             "%(project_id)s::text AS entity_id, "
             "'cost_per_ha'::text AS feature_name, "
-            "COALESCE(tc.cost / NULLIF(th.hectares, 0), 0)::float AS value "
-            "FROM total_cost tc "
-            "JOIN total_ha th ON th.project_id = tc.project_id "
+            "COALESCE(SUM(direct_cost_total_usd), 0) / NULLIF(SUM(hectares), 0)::float AS value "
+            "FROM v4_report.lot_metrics "
+            "WHERE project_id = %(project_id)s "
             "LIMIT %(limit)s"
         ),
         params_model=ProjectScopeParams,
@@ -159,17 +144,16 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
     ),
     "feature_inputs_usage": SQLCatalogEntry(
         query_id="feature_inputs_usage",
-        description="Uso total de insumos (workorder_items.total_used).",
+        description="Uso total de insumos (USD, por proyecto).",
         sql_template=(
-            "SELECT w.project_id::text AS project_id, "
+            "SELECT project_id::text AS project_id, "
             "'project'::text AS entity_type, "
-            "w.project_id::text AS entity_id, "
+            "project_id::text AS entity_id, "
             "'inputs_total_used'::text AS feature_name, "
-            "COALESCE(SUM(i.total_used), 0)::float AS value "
-            "FROM public.workorders w "
-            "JOIN public.workorder_items i ON i.workorder_id = w.id "
-            "WHERE w.project_id = %(project_id)s "
-            "GROUP BY w.project_id "
+            "COALESCE(SUM(total_insumos_usd), 0)::float AS value "
+            "FROM v4_report.field_crop_insumos "
+            "WHERE project_id = %(project_id)s "
+            "GROUP BY project_id "
             "LIMIT %(limit)s"
         ),
         params_model=ProjectScopeParams,
@@ -181,14 +165,14 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
         query_id="feature_workorders_count",
         description="Cantidad de ordenes de trabajo por proyecto.",
         sql_template=(
-            "SELECT w.project_id::text AS project_id, "
+            "SELECT project_id::text AS project_id, "
             "'project'::text AS entity_type, "
-            "w.project_id::text AS entity_id, "
+            "project_id::text AS entity_id, "
             "'workorders_count'::text AS feature_name, "
-            "COUNT(*)::float AS value "
-            "FROM public.workorders w "
-            "WHERE w.project_id = %(project_id)s "
-            "GROUP BY w.project_id "
+            "COALESCE(SUM(total_workorders), 0)::float AS value "
+            "FROM v4_report.labor_metrics "
+            "WHERE project_id = %(project_id)s "
+            "GROUP BY project_id "
             "LIMIT %(limit)s"
         ),
         params_model=ProjectScopeParams,
@@ -207,6 +191,7 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
             "COALESCE(SUM(s.real_stock_units - s.initial_units), 0)::float AS value "
             "FROM public.stocks s "
             "WHERE s.project_id = %(project_id)s "
+            "  AND s.deleted_at IS NULL "
             "GROUP BY s.project_id "
             "LIMIT %(limit)s"
         ),
@@ -219,15 +204,143 @@ _FEATURE_CATALOG: dict[str, SQLCatalogEntry] = {
         query_id="feature_total_hectares",
         description="Hectareas totales por proyecto.",
         sql_template=(
-            "SELECT f.project_id::text AS project_id, "
+            "SELECT %(project_id)s::text AS project_id, "
             "'project'::text AS entity_type, "
-            "f.project_id::text AS entity_id, "
+            "%(project_id)s::text AS entity_id, "
             "'total_hectares'::text AS feature_name, "
-            "COALESCE(SUM(lo.hectares), 0)::float AS value "
-            "FROM public.fields f "
-            "JOIN public.lots lo ON lo.field_id = f.id "
-            "WHERE f.project_id = %(project_id)s "
-            "GROUP BY f.project_id "
+            "v4_ssot.total_hectares_for_project(%(project_id)s)::float AS value "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_cost_total_last_30d": SQLCatalogEntry(
+        query_id="feature_cost_total_last_30d",
+        description="Costos directos ejecutados ultimos 30 dias.",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'cost_total'::text AS feature_name, "
+            "COALESCE(SUM(lb.price * w.effective_area), 0)::float AS value "
+            "FROM public.workorders w "
+            "JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.effective_area > 0 "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '30 days') "
+            "GROUP BY w.project_id "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_cost_total_last_7d": SQLCatalogEntry(
+        query_id="feature_cost_total_last_7d",
+        description="Costos directos ejecutados ultimos 7 dias.",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'cost_total'::text AS feature_name, "
+            "COALESCE(SUM(lb.price * w.effective_area), 0)::float AS value "
+            "FROM public.workorders w "
+            "JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.effective_area > 0 "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '7 days') "
+            "GROUP BY w.project_id "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_inputs_last_30d": SQLCatalogEntry(
+        query_id="feature_inputs_last_30d",
+        description="Uso de insumos ultimos 30 dias (total_used).",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'inputs_total_used'::text AS feature_name, "
+            "COALESCE(SUM(wi.total_used), 0)::float AS value "
+            "FROM public.workorders w "
+            "JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '30 days') "
+            "GROUP BY w.project_id "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_inputs_last_7d": SQLCatalogEntry(
+        query_id="feature_inputs_last_7d",
+        description="Uso de insumos ultimos 7 dias (total_used).",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'inputs_total_used'::text AS feature_name, "
+            "COALESCE(SUM(wi.total_used), 0)::float AS value "
+            "FROM public.workorders w "
+            "JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '7 days') "
+            "GROUP BY w.project_id "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_workorders_last_30d": SQLCatalogEntry(
+        query_id="feature_workorders_last_30d",
+        description="Cantidad de workorders ultimos 30 dias.",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'workorders_count'::text AS feature_name, "
+            "COUNT(*)::float AS value "
+            "FROM public.workorders w "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '30 days') "
+            "GROUP BY w.project_id "
+            "LIMIT %(limit)s"
+        ),
+        params_model=ProjectScopeParams,
+        default_limit=1,
+        max_limit=50,
+        implemented=True,
+    ),
+    "feature_workorders_last_7d": SQLCatalogEntry(
+        query_id="feature_workorders_last_7d",
+        description="Cantidad de workorders ultimos 7 dias.",
+        sql_template=(
+            "SELECT w.project_id::text AS project_id, "
+            "'project'::text AS entity_type, "
+            "w.project_id::text AS entity_id, "
+            "'workorders_count'::text AS feature_name, "
+            "COUNT(*)::float AS value "
+            "FROM public.workorders w "
+            "WHERE w.project_id = %(project_id)s "
+            "  AND w.deleted_at IS NULL "
+            "  AND w.date >= (CURRENT_DATE - INTERVAL '7 days') "
+            "GROUP BY w.project_id "
             "LIMIT %(limit)s"
         ),
         params_model=ProjectScopeParams,

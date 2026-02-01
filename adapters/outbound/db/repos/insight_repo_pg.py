@@ -27,6 +27,15 @@ def _row_to_insight(row: dict) -> Insight:
         computed_at=row["computed_at"],
         valid_until=row["valid_until"],
         status=row["status"],
+        impact_min=row.get("impact_min"),
+        impact_max=row.get("impact_max"),
+        impact_unit=row.get("impact_unit"),
+        confidence=row.get("confidence"),
+        dedupe_key=row.get("dedupe_key"),
+        cooldown_until=row.get("cooldown_until"),
+        computed_by=row.get("computed_by", "on_demand"),
+        job_run_id=row.get("job_run_id"),
+        rules_version=row.get("rules_version", "v1"),
     )
 
 
@@ -45,11 +54,15 @@ class InsightRepositoryPG(InsightRepositoryPort):
                         INSERT INTO ai_insights (
                             id, project_id, entity_type, entity_id, type, severity, priority,
                             title, summary, evidence_json, explanations_json, action_json,
-                            model_version, features_version, computed_at, valid_until, status
+                            model_version, features_version, computed_at, valid_until, status,
+                            impact_min, impact_max, impact_unit, confidence,
+                            dedupe_key, cooldown_until, computed_by, job_run_id, rules_version
                         ) VALUES (
                             %(id)s, %(project_id)s, %(entity_type)s, %(entity_id)s, %(type)s, %(severity)s, %(priority)s,
                             %(title)s, %(summary)s, %(evidence_json)s, %(explanations_json)s, %(action_json)s,
-                            %(model_version)s, %(features_version)s, %(computed_at)s, %(valid_until)s, %(status)s
+                            %(model_version)s, %(features_version)s, %(computed_at)s, %(valid_until)s, %(status)s,
+                            %(impact_min)s, %(impact_max)s, %(impact_unit)s, %(confidence)s,
+                            %(dedupe_key)s, %(cooldown_until)s, %(computed_by)s, %(job_run_id)s, %(rules_version)s
                         )
                         ON CONFLICT (id) DO UPDATE SET
                             severity = EXCLUDED.severity,
@@ -59,7 +72,16 @@ class InsightRepositoryPG(InsightRepositoryPort):
                             explanations_json = EXCLUDED.explanations_json,
                             action_json = EXCLUDED.action_json,
                             valid_until = EXCLUDED.valid_until,
-                            status = EXCLUDED.status
+                            status = EXCLUDED.status,
+                            impact_min = EXCLUDED.impact_min,
+                            impact_max = EXCLUDED.impact_max,
+                            impact_unit = EXCLUDED.impact_unit,
+                            confidence = EXCLUDED.confidence,
+                            dedupe_key = EXCLUDED.dedupe_key,
+                            cooldown_until = EXCLUDED.cooldown_until,
+                            computed_by = EXCLUDED.computed_by,
+                            job_run_id = EXCLUDED.job_run_id,
+                            rules_version = EXCLUDED.rules_version
                         """,
                         {
                             "id": insight.id,
@@ -79,6 +101,15 @@ class InsightRepositoryPG(InsightRepositoryPort):
                             "computed_at": insight.computed_at,
                             "valid_until": insight.valid_until,
                             "status": insight.status,
+                            "impact_min": insight.impact_min,
+                            "impact_max": insight.impact_max,
+                            "impact_unit": insight.impact_unit,
+                            "confidence": insight.confidence,
+                            "dedupe_key": insight.dedupe_key,
+                            "cooldown_until": insight.cooldown_until,
+                            "computed_by": insight.computed_by,
+                            "job_run_id": insight.job_run_id,
+                            "rules_version": insight.rules_version,
                         },
                     )
             conn.commit()
@@ -108,7 +139,9 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     """
                     SELECT COUNT(*) AS total
                     FROM ai_insights
-                    WHERE project_id = %(project_id)s AND status = 'new'
+                    WHERE project_id = %(project_id)s
+                      AND status = 'new'
+                      AND valid_until >= NOW()
                     """,
                     {"project_id": project_id},
                 )
@@ -117,7 +150,10 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     """
                     SELECT COUNT(*) AS total
                     FROM ai_insights
-                    WHERE project_id = %(project_id)s AND status = 'new' AND severity >= 80
+                    WHERE project_id = %(project_id)s
+                      AND status = 'new'
+                      AND severity >= 80
+                      AND valid_until >= NOW()
                     """,
                     {"project_id": project_id},
                 )
@@ -127,6 +163,8 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     SELECT *
                     FROM ai_insights
                     WHERE project_id = %(project_id)s
+                      AND status = 'new'
+                      AND valid_until >= NOW()
                     ORDER BY severity DESC, computed_at DESC
                     LIMIT 3
                     """,
@@ -175,3 +213,70 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     {"project_id": project_id},
                 )
             conn.commit()
+
+    def get_active_by_dedupe(
+        self,
+        project_id: str,
+        entity_type: str,
+        entity_id: str,
+        dedupe_key: str,
+    ) -> Insight | None:
+        with self.session.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM ai_insights
+                    WHERE project_id = %(project_id)s
+                      AND entity_type = %(entity_type)s
+                      AND entity_id = %(entity_id)s
+                      AND dedupe_key = %(dedupe_key)s
+                      AND status = 'new'
+                      AND valid_until >= NOW()
+                    ORDER BY computed_at DESC
+                    LIMIT 1
+                    """,
+                    {
+                        "project_id": project_id,
+                        "entity_type": entity_type,
+                        "entity_id": entity_id,
+                        "dedupe_key": dedupe_key,
+                    },
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return _row_to_insight(dict(row))
+
+    def count_active(self, project_id: str) -> int:
+        with self.session.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM ai_insights
+                    WHERE project_id = %(project_id)s
+                      AND status = 'new'
+                      AND valid_until >= NOW()
+                    """,
+                    {"project_id": project_id},
+                )
+                return int(cur.fetchone()["total"])
+
+    def list_active(self, project_id: str, limit: int) -> list[Insight]:
+        with self.session.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM ai_insights
+                    WHERE project_id = %(project_id)s
+                      AND status = 'new'
+                      AND valid_until >= NOW()
+                    ORDER BY severity DESC, computed_at DESC
+                    LIMIT %(limit)s
+                    """,
+                    {"project_id": project_id, "limit": limit},
+                )
+                rows = cur.fetchall()
+        return [_row_to_insight(dict(row)) for row in rows]

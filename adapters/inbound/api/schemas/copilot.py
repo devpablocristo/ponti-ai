@@ -22,6 +22,8 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[dict[str, Any]]
     warnings: list[str]
+    related_insights_count: int
+    related_insights: list[dict[str, Any]]
 
 
 class IngestDocument(BaseModel):

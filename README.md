@@ -1,6 +1,6 @@
 TLDR:
 1. `cp .env.example .env`
-2. Configurar `AI_SERVICE_KEYS` y ratios de insights en `.env`
+2. Configurar `AI_SERVICE_KEYS` y parametros de insights en `.env`
 3. `make up`
 4. `make run`
 
@@ -37,6 +37,7 @@ make run
 - `GET /v1/insights/summary`
 - `POST /v1/insights/{insight_id}/actions`
 - `POST /v1/jobs/recompute-active`
+- `POST /v1/jobs/recompute-baselines`
 
 ## Headers requeridos
 ```
@@ -45,10 +46,56 @@ X-USER-ID: 123
 X-PROJECT-ID: demo-project
 ```
 
-## Insights (baseline)
-Las alertas comparan el valor del proyecto contra el promedio global usando ratios:
-- `INSIGHTS_RATIO_HIGH` (anomaly)
-- `INSIGHTS_RATIO_MEDIUM` (recommendation)
+## Insights (baseline + timing)
+Las alertas comparan el valor del proyecto contra percentiles:
+- Baseline propio (historial del proyecto)
+- Baseline por cohorte (size=small|medium|large)
+
+Reglas principales:
+- Percentiles p75/p90
+- Spike (7d vs 30d)
+
+Parametros:
+- `INSIGHTS_RATIO_HIGH`, `INSIGHTS_RATIO_MEDIUM`
+- `INSIGHTS_SPIKE_RATIO`
+- `INSIGHTS_COOLDOWN_DAYS`
+- `INSIGHTS_IMPACT_K`, `INSIGHTS_IMPACT_CAP`
+
+Salida extendida por insight:
+- `impact_min`, `impact_max`, `impact_unit`
+- `confidence`
+- `dedupe_key`, `cooldown_until`
+- `action_json` con `action_type`, `action_params`, `suggested_due_date`, `cta_label`
+
+Integracion Copilot:
+`/v1/ask` incluye `related_insights_count` y `related_insights` (top 3).
+
+## Diagrama de flujo
+```
+FE (UI)
+ → BFF (ponti-frontend/api, valida JWT)
+ → Backend Go (proxy seguro)
+ → AI Service (FastAPI, READ-ONLY)
+```
+
+## Ejemplo de insight
+```json
+{
+  "title": "cost_total alto vs baseline",
+  "type": "anomaly",
+  "severity": 80,
+  "impact_min": 0.35,
+  "impact_max": 0.65,
+  "impact_unit": "%",
+  "confidence": "high",
+  "action": {
+    "action_type": "review_inputs",
+    "action_params": { "feature": "cost_total", "window": "all" },
+    "suggested_due_date": "2026-02-07",
+    "cta_label": "Revisar costos"
+  }
+}
+```
 
 ## Arquitectura (hexagonal liviana)
 - `domain/`: entidades y value objects

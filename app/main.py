@@ -7,6 +7,7 @@ from adapters.inbound.api.routes.health import router as health_router
 from adapters.inbound.api.routes.insights import router as insights_router
 from adapters.inbound.api.routes.jobs import router as jobs_router
 from adapters.outbound.db.repos.audit_logger_pg import AuditLoggerPG
+from adapters.outbound.db.repos.insight_reader_pg import InsightReaderPG
 from adapters.outbound.db.job_lock_pg import JobLockPG
 from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     sql_executor = SQLExecutor(settings)
     rag_repo = RagRepositoryPG(settings)
     audit_logger = AuditLoggerPG(settings)
+    insight_reader = InsightReaderPG(settings)
 
     ask_copilot = AskCopilot(
         settings=settings,
@@ -46,24 +48,34 @@ def create_app() -> FastAPI:
         sql_executor=sql_executor,
         rag_repo=rag_repo,
         audit_logger=audit_logger,
+        insight_reader=insight_reader,
     )
     ingest_rag = IngestRag(rag_repo)
 
     feature_repo = FeatureRepositoryPG(settings)
     insight_repo = InsightRepositoryPG(settings)
+
+    baseline_repo = BaselineRepositoryPG(settings)
+    baseline_computer = BaselineComputerPG(settings)
+    project_repo = ProjectRepositoryPG(settings)
+    job_lock = JobLockPG(settings)
+
     model_runner = AnomalyRunner(
+        baseline_repo=baseline_repo,
         ratio_high=settings.insights_ratio_high,
         ratio_medium=settings.insights_ratio_medium,
+        spike_ratio=settings.insights_spike_ratio,
+        size_small_max=settings.insights_size_small_max,
+        size_medium_max=settings.insights_size_medium_max,
+        cooldown_days=settings.insights_cooldown_days,
+        impact_k=settings.insights_impact_k,
+        impact_cap=settings.insights_impact_cap,
     )
     compute_insights = ComputeInsights(feature_repo, model_runner, insight_repo, audit_logger)
     get_insights = GetInsights(insight_repo)
     get_summary = GetSummary(insight_repo)
     record_action = RecordAction(insight_repo, audit_logger)
 
-    baseline_repo = BaselineRepositoryPG(settings)
-    baseline_computer = BaselineComputerPG(settings)
-    project_repo = ProjectRepositoryPG(settings)
-    job_lock = JobLockPG(settings)
     recompute_active = RecomputeActive(compute_insights, insight_repo, job_lock)
     recompute_baselines = RecomputeBaselines(baseline_computer, baseline_repo, project_repo, job_lock)
 

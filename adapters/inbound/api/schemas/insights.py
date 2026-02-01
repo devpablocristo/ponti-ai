@@ -21,6 +21,15 @@ class InsightItem(BaseModel):
     computed_at: str
     valid_until: str
     status: str
+    impact_min: float | None = None
+    impact_max: float | None = None
+    impact_unit: str | None = None
+    confidence: str | None = None
+    dedupe_key: str | None = None
+    cooldown_until: str | None = None
+    computed_by: str | None = None
+    job_run_id: str | None = None
+    rules_version: str | None = None
 
 
 class ComputeInsightsResponse(BaseModel):

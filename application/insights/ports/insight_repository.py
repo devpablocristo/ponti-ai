@@ -26,3 +26,18 @@ class InsightRepositoryPort(Protocol):
 
     def mark_recomputed(self, project_id: str) -> None:
         ...
+
+    def get_active_by_dedupe(
+        self,
+        project_id: str,
+        entity_type: str,
+        entity_id: str,
+        dedupe_key: str,
+    ) -> Insight | None:
+        ...
+
+    def count_active(self, project_id: str) -> int:
+        ...
+
+    def list_active(self, project_id: str, limit: int) -> list[Insight]:
+        ...

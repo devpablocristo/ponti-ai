@@ -22,7 +22,12 @@ class RecomputeActive:
             return {"status": "locked", "job_run_id": ""}
         job_run_id = str(uuid.uuid4())
         try:
-            self.compute_insights.handle(project_id=project_id, user_id="scheduler")
+            self.compute_insights.handle(
+                project_id=project_id,
+                user_id="scheduler",
+                computed_by="scheduler",
+                job_run_id=job_run_id,
+            )
             self.insight_repo.mark_recomputed(project_id)
         finally:
             self.job_lock.release(lock_key)

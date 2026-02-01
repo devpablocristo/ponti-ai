@@ -22,3 +22,12 @@ class Insight:
     computed_at: datetime
     valid_until: datetime
     status: str
+    impact_min: float | None = None
+    impact_max: float | None = None
+    impact_unit: str | None = None
+    confidence: str | None = None
+    dedupe_key: str | None = None
+    cooldown_until: datetime | None = None
+    computed_by: str = "on_demand"
+    job_run_id: str | None = None
+    rules_version: str = "v1"

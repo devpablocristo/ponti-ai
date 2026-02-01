@@ -48,6 +48,16 @@ def ask(
         answer=result.answer,
         sources=result.sources,
         warnings=result.warnings,
+        related_insights_count=result.related_insights_count,
+        related_insights=[
+            {
+                "id": item.id,
+                "entity_type": item.entity_type,
+                "entity_id": item.entity_id,
+                "title": item.title,
+            }
+            for item in result.related_insights
+        ],
     )
 
 
