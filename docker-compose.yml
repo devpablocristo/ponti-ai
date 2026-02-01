@@ -1,0 +1,47 @@
+services:
+  ai-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ai_copilot
+    ports:
+      - "55432:5432"
+    volumes:
+      - ai-db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_copilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ai-migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      ai-db:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "postgresql://postgres:postgres@ai-db:5432/ai_copilot?sslmode=disable", "up"]
+
+  ai-copilot:
+    build: .
+    depends_on:
+      ai-db:
+        condition: service_healthy
+    environment:
+      - APP_NAME=ai-copilot-service
+      - APP_ENV=local
+      - DB_DSN=postgresql://postgres:postgres@ai-db:5432/ai_copilot?sslmode=disable
+      - AI_API_KEYS=abc123secreta
+      - STATEMENT_TIMEOUT_MS=2000
+      - MAX_LIMIT=200
+      - DEFAULT_LIMIT=50
+      - EMBEDDING_DIM=1536
+      - RAG_TOP_K=5
+      - LLM_PROVIDER=stub
+    ports:
+      - "8090:8090"
+
+volumes:
+  ai-db_data:
