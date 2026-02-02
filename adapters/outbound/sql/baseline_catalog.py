@@ -46,7 +46,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'cost_total'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -91,7 +91,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'cost_per_ha'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -136,7 +136,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'inputs_total_used'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -179,7 +179,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'workorders_count'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -225,7 +225,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'stock_variance'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -266,7 +266,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'total_hectares'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -319,7 +319,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'cost_total'::text AS feature_name,
-          'last_30d'::text AS window,
+          'last_30d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -372,7 +372,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'cost_total'::text AS feature_name,
-          'last_7d'::text AS window,
+          'last_7d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -424,7 +424,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'inputs_total_used'::text AS feature_name,
-          'last_30d'::text AS window,
+          'last_30d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -476,7 +476,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'inputs_total_used'::text AS feature_name,
-          'last_7d'::text AS window,
+          'last_7d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -526,7 +526,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'workorders_count'::text AS feature_name,
-          'last_30d'::text AS window,
+          'last_30d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -576,7 +576,7 @@ _COHORT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           cohort_key,
           'workorders_count'::text AS feature_name,
-          'last_7d'::text AS window,
+          'last_7d'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -601,7 +601,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
             COALESCE(SUM(lb.price * w.effective_area), 0) AS value
           FROM public.workorders w
           JOIN public.labors lb ON lb.id = w.labor_id AND lb.deleted_at IS NULL
-          WHERE w.project_id = %(project_id)s
+          WHERE w.project_id = %(project_id)s::bigint
             AND w.deleted_at IS NULL
             AND w.effective_area > 0
             AND w.date >= (CURRENT_DATE - (%(baseline_days)s || ' days')::interval)
@@ -611,7 +611,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           'self'::text AS cohort_key,
           'cost_total'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -631,7 +631,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
             COALESCE(SUM(wi.total_used), 0) AS value
           FROM public.workorders w
           JOIN public.workorder_items wi ON wi.workorder_id = w.id AND wi.deleted_at IS NULL
-          WHERE w.project_id = %(project_id)s
+          WHERE w.project_id = %(project_id)s::bigint
             AND w.deleted_at IS NULL
             AND w.date >= (CURRENT_DATE - (%(baseline_days)s || ' days')::interval)
           GROUP BY w.date::date
@@ -640,7 +640,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           'self'::text AS cohort_key,
           'inputs_total_used'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -659,7 +659,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
             w.date::date AS day,
             COUNT(*) AS value
           FROM public.workorders w
-          WHERE w.project_id = %(project_id)s
+          WHERE w.project_id = %(project_id)s::bigint
             AND w.deleted_at IS NULL
             AND w.date >= (CURRENT_DATE - (%(baseline_days)s || ' days')::interval)
           GROUP BY w.date::date
@@ -668,7 +668,7 @@ _PROJECT_QUERIES: list[BaselineQuery] = [
           %(project_id)s::text AS project_id,
           'self'::text AS cohort_key,
           'workorders_count'::text AS feature_name,
-          'all'::text AS window,
+          'all'::text AS window_name,
           percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
           percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
           percentile_cont(0.9) WITHIN GROUP (ORDER BY value) AS p90,
@@ -684,7 +684,7 @@ PROJECT_LIST_SQL = """
 SELECT %(project_id)s::text AS project_id, id
 FROM public.projects
 WHERE deleted_at IS NULL
-  AND (%(start_after_id)s IS NULL OR id > %(start_after_id)s)
+  AND (%(start_after_id)s::bigint IS NULL OR id > %(start_after_id)s::bigint)
 ORDER BY id
 LIMIT %(limit)s
 """

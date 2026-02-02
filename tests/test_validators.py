@@ -21,3 +21,10 @@ def test_validate_project_id_required() -> None:
 def test_validate_adds_limit() -> None:
     sql = validate_sql_template("SELECT %(project_id)s::text AS project_id")
     assert "LIMIT %(limit)s" in sql
+
+
+def test_validate_allows_with_select() -> None:
+    sql = validate_sql_template(
+        "WITH base AS (SELECT %(project_id)s::text AS project_id) SELECT * FROM base"
+    )
+    assert "LIMIT %(limit)s" in sql

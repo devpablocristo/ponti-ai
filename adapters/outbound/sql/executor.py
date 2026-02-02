@@ -35,7 +35,9 @@ class SQLExecutor:
 
         with self.session.connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SET LOCAL statement_timeout = %s", (statement_timeout_ms,))
+                # Evitar parametros en SET LOCAL para compatibilidad con PostgreSQL.
+                timeout_ms = int(statement_timeout_ms)
+                cur.execute(f"SET LOCAL statement_timeout = {timeout_ms}")
                 cur.execute(sql, params)
                 rows = cur.fetchall()
                 return [dict(row) for row in rows]

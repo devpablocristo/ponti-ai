@@ -25,10 +25,10 @@ class BaselineRepositoryPG(BaselineRepositoryPort):
                     cur.execute(
                         """
                         INSERT INTO ai_baselines (
-                            id, scope_type, scope_id, cohort_key, feature_name, window,
+                            id, scope_type, scope_id, cohort_key, feature_name, window_name,
                             p50, p75, p90, n_samples, computed_at
                         ) VALUES (
-                            %(id)s, %(scope_type)s, %(scope_id)s, %(cohort_key)s, %(feature_name)s, %(window)s,
+                            %(id)s, %(scope_type)s, %(scope_id)s, %(cohort_key)s, %(feature_name)s, %(window_name)s,
                             %(p50)s, %(p75)s, %(p90)s, %(n_samples)s, %(computed_at)s
                         )
                         ON CONFLICT (id) DO UPDATE SET
@@ -44,7 +44,7 @@ class BaselineRepositoryPG(BaselineRepositoryPort):
                             "scope_id": record.scope_id,
                             "cohort_key": record.cohort_key,
                             "feature_name": record.feature_name,
-                            "window": record.window,
+                            "window_name": record.window,
                             "p50": record.p50,
                             "p75": record.p75,
                             "p90": record.p90,
@@ -73,7 +73,7 @@ class BaselineRepositoryPG(BaselineRepositoryPort):
                       AND scope_id IS NOT DISTINCT FROM %(scope_id)s
                       AND cohort_key = %(cohort_key)s
                       AND feature_name = %(feature_name)s
-                      AND window = %(window)s
+                      AND window_name = %(window_name)s
                     ORDER BY computed_at DESC
                     LIMIT 1
                     """,
@@ -82,7 +82,7 @@ class BaselineRepositoryPG(BaselineRepositoryPort):
                         "scope_id": scope_id,
                         "cohort_key": cohort_key,
                         "feature_name": feature_name,
-                        "window": window,
+                        "window_name": window,
                     },
                 )
                 row = cur.fetchone()
@@ -93,7 +93,7 @@ class BaselineRepositoryPG(BaselineRepositoryPort):
             scope_id=row["scope_id"],
             cohort_key=row["cohort_key"],
             feature_name=row["feature_name"],
-            window=row["window"],
+            window=row["window_name"],
             p50=float(row["p50"]),
             p75=float(row["p75"]),
             p90=float(row["p90"]),

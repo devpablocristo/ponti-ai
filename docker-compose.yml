@@ -32,9 +32,9 @@ services:
     environment:
       - APP_NAME=ai-copilot-service
       - APP_ENV=local
-      - DB_DSN=postgresql://postgres:postgres@ai-db:5432/ai_copilot?sslmode=disable
+      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/ponti_api_db?sslmode=disable
       - AI_SERVICE_KEYS=servicekey123
-      - STATEMENT_TIMEOUT_MS=2000
+      - STATEMENT_TIMEOUT_MS=20000
       - MAX_LIMIT=200
       - DEFAULT_LIMIT=50
       - EMBEDDING_DIM=1536
@@ -55,6 +55,17 @@ services:
       - INSIGHTS_BASELINE_BATCH_SIZE=200
     ports:
       - "8090:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ai-test:
+    build: .
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    entrypoint: ["pytest"]
 
 volumes:
   ai-db_data:

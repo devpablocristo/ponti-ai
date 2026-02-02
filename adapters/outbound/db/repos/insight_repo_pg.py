@@ -10,7 +10,7 @@ from domain.insights.entities import Insight
 
 def _row_to_insight(row: dict) -> Insight:
     return Insight(
-        id=row["id"],
+        id=str(row["id"]),
         project_id=row["project_id"],
         entity_type=row["entity_type"],
         entity_id=row["entity_id"],
