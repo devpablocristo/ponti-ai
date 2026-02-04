@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from application.insights.ports.feature_repository import FeatureRepositoryPort, FeatureValue
+from application.insights.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
 from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
+from application.insights.ports.insight_planner import InsightPlannerPort
 from application.insights.ports.model_runner import ModelRunnerPort
 from application.insights.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
+from application.insights.ports.proposal_store import ProposalStorePort, StoredProposal
 from application.insights.use_cases.compute_insights import ComputeInsights
 from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
@@ -39,7 +42,7 @@ class FakeModelRunner(ModelRunnerPort):
                 priority=80,
                 title="Alerta de costo",
                 summary="Costo fuera de rango.",
-                evidence={"feature": "cost_total"},
+                evidence={"feature": "cost_total", "n_samples": 60, "window": "all", "p90": 30.0, "value": 40.0},
                 explanations={"rule": "test"},
                 action={"suggestion": "Revisar"},
                 model_version="test",
@@ -61,6 +64,12 @@ class FakeInsightRepo(InsightRepositoryPort):
 
     def get_by_entity(self, project_id: str, entity_type: str, entity_id: str) -> list[Insight]:
         return [i for i in self.items if i.project_id == project_id and i.entity_id == entity_id]
+
+    def get_by_id(self, project_id: str, insight_id: str) -> Insight | None:
+        for i in self.items:
+            if i.project_id == project_id and i.id == insight_id:
+                return i
+        return None
 
     def get_summary(self, project_id: str) -> InsightSummary:
         new_items = [i for i in self.items if i.project_id == project_id and i.status == "new"]
@@ -134,17 +143,148 @@ class FakeAuditLogger(AuditLoggerPort):
         return None
 
 
+class FakeProposalStore(ProposalStorePort):
+    def __init__(self) -> None:
+        self.items: list[StoredProposal] = []
+
+    def get_latest_ok(self, insight_id: str) -> StoredProposal | None:
+        ok = [p for p in self.items if p.insight_id == insight_id and p.status == "ok"]
+        return ok[-1] if ok else None
+
+    def get_latest(self, insight_id: str) -> StoredProposal | None:
+        all_items = [p for p in self.items if p.insight_id == insight_id]
+        return all_items[-1] if all_items else None
+
+    def insert(
+        self,
+        *,
+        insight_id: str,
+        project_id: str,
+        proposal: dict,
+        prompt_version: str,
+        tools_catalog_version: str,
+        llm_provider: str,
+        llm_model: str,
+        status: str,
+        error_message: str | None,
+    ) -> str:
+        pid = f"prop-{len(self.items)+1}"
+        self.items.append(
+            StoredProposal(
+                id=pid,
+                insight_id=insight_id,
+                project_id=project_id,
+                proposal=proposal,
+                prompt_version=prompt_version,
+                tools_catalog_version=tools_catalog_version,
+                llm_provider=llm_provider,
+                llm_model=llm_model,
+                status=status,  # type: ignore[arg-type]
+                error_message=error_message,
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        return pid
+
+
+class FakePlanner(InsightPlannerPort):
+    def plan(
+        self,
+        *,
+        insight: Insight,
+        historical_context: dict,
+        domain: str,
+        max_actions_allowed: int,
+    ) -> dict:
+        _ = historical_context
+        _ = domain
+        _ = max_actions_allowed
+        return {
+            "classification": {"severity": "high", "actionability": "act", "confidence": 0.85},
+            "decision_summary": {"recommended_outcome": "propose_actions", "primary_reason": "test"},
+            "proposed_plan": [
+                {
+                    "step": 1,
+                    "action": f"Review {insight.id}",
+                    "tool": "request_cost_breakdown",
+                    "tool_args": {"feature": "cost_total", "time_window": "all", "project_id": insight.project_id, "insight_id": insight.id},
+                    "rationale": "test",
+                    "reversible": True,
+                }
+            ],
+            "risks_and_uncertainties": [],
+            "explanation": {"human_readable": "x", "audit_focused": "y", "what_to_watch_next": "z"},
+        }
+
+
+class FakeHistory(InsightHistoryPort):
+    def get_history(self, project_id: str, entity_type: str, entity_id: str, limit: int) -> list[InsightHistoryItem]:
+        _ = project_id
+        _ = entity_type
+        _ = entity_id
+        _ = limit
+        return []
+
+    def get_recent_actions(self, project_id: str, limit: int) -> list[InsightActionItem]:
+        _ = project_id
+        _ = limit
+        return []
+
+
 def test_compute_insights_creates_records() -> None:
-    use_case = ComputeInsights(FakeFeatureRepo(), FakeModelRunner(), FakeInsightRepo(), FakeAuditLogger())
+    use_case = ComputeInsights(
+        FakeFeatureRepo(),
+        FakeModelRunner(),
+        FakeInsightRepo(),
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    )
     result = use_case.handle(project_id="p1", user_id="u1")
     assert result["insights_created"] == 1
+
+
+def test_compute_insights_creates_proposal_when_gating_passes() -> None:
+    proposal_store = FakeProposalStore()
+    use_case = ComputeInsights(
+        FakeFeatureRepo(),
+        FakeModelRunner(),
+        FakeInsightRepo(),
+        FakeAuditLogger(),
+        proposal_store,
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    )
+    use_case.handle(project_id="p1", user_id="u1")
+    assert proposal_store.get_latest_ok("ins-1") is not None
 
 
 def test_summary_counts() -> None:
     repo = FakeInsightRepo()
     model = FakeModelRunner()
     features = FakeFeatureRepo()
-    ComputeInsights(features, model, repo, FakeAuditLogger()).handle("p1", "u1")
+    ComputeInsights(
+        features,
+        model,
+        repo,
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    ).handle("p1", "u1")
     summary = GetSummary(repo).handle("p1")
     assert summary.new_count_total == 1
     assert summary.new_count_high_severity == 1
@@ -154,7 +294,19 @@ def test_action_updates_status() -> None:
     repo = FakeInsightRepo()
     model = FakeModelRunner()
     features = FakeFeatureRepo()
-    ComputeInsights(features, model, repo, FakeAuditLogger()).handle("p1", "u1")
+    ComputeInsights(
+        features,
+        model,
+        repo,
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    ).handle("p1", "u1")
     RecordAction(repo, FakeAuditLogger()).handle("ins-1", "p1", "u1", "ignored", "ignored")
     summary = GetSummary(repo).handle("p1")
     assert summary.new_count_total == 0
@@ -212,7 +364,19 @@ def test_compute_insights_respects_cooldown() -> None:
                 )
             ]
 
-    result = ComputeInsights(FakeFeatureRepo(), CooldownModel(), repo, FakeAuditLogger()).handle("p1", "u1")
+    result = ComputeInsights(
+        FakeFeatureRepo(),
+        CooldownModel(),
+        repo,
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    ).handle("p1", "u1")
     assert result["insights_created"] == 0
 
 

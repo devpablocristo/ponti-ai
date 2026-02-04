@@ -8,19 +8,22 @@ from adapters.inbound.api.routes.insights import router as insights_router
 from adapters.inbound.api.routes.jobs import router as jobs_router
 from adapters.outbound.db.repos.audit_logger_pg import AuditLoggerPG
 from adapters.outbound.db.repos.insight_reader_pg import InsightReaderPG
+from adapters.outbound.db.repos.insight_history_pg import InsightHistoryPG
 from adapters.outbound.db.job_lock_pg import JobLockPG
 from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
+from adapters.outbound.db.repos.proposal_store_pg import ProposalStorePG
 from adapters.outbound.db.repos.rag_repo_pg import RagRepositoryPG
+from adapters.outbound.llm.client import build_llm_client
+from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
+from adapters.outbound.llm.insight_planner import InsightPlannerLLM
 from adapters.outbound.models.anomaly_runner import AnomalyRunner
-from adapters.outbound.models.intent_classifier import IntentClassifier
 from adapters.outbound.sql.baseline_computer_pg import BaselineComputerPG
 from adapters.outbound.sql.project_repo_pg import ProjectRepositoryPG
-from adapters.outbound.sql.catalog_adapter import SQLCatalogAdapter
-from adapters.outbound.sql.executor import SQLExecutor
 from app.config import load_settings
 from application.copilot.use_cases.ask_copilot import AskCopilot
+from application.copilot.use_cases.explain_insight import ExplainInsight
 from application.copilot.use_cases.ingest_rag import IngestRag
 from application.insights.use_cases.compute_insights import ComputeInsights
 from application.insights.use_cases.get_insights import GetInsights
@@ -34,31 +37,24 @@ def create_app() -> FastAPI:
     load_dotenv()
     settings = load_settings()
 
-    intent_classifier = IntentClassifier()
-    sql_catalog = SQLCatalogAdapter()
-    sql_executor = SQLExecutor(settings)
     rag_repo = RagRepositoryPG(settings)
     audit_logger = AuditLoggerPG(settings)
     insight_reader = InsightReaderPG(settings)
-
-    ask_copilot = AskCopilot(
-        settings=settings,
-        intent_classifier=intent_classifier,
-        sql_catalog=sql_catalog,
-        sql_executor=sql_executor,
-        rag_repo=rag_repo,
-        audit_logger=audit_logger,
-        insight_reader=insight_reader,
-    )
     ingest_rag = IngestRag(rag_repo)
 
     feature_repo = FeatureRepositoryPG(settings)
     insight_repo = InsightRepositoryPG(settings)
+    insight_history = InsightHistoryPG(settings)
+    proposal_store = ProposalStorePG(settings)
 
     baseline_repo = BaselineRepositoryPG(settings)
     baseline_computer = BaselineComputerPG(settings)
     project_repo = ProjectRepositoryPG(settings)
     job_lock = JobLockPG(settings)
+
+    llm_client = build_llm_client(settings)
+    insight_planner = InsightPlannerLLM(llm_client)
+    copilot_explainer = CopilotExplainerLLM(llm_client)
 
     model_runner = AnomalyRunner(
         baseline_repo=baseline_repo,
@@ -71,7 +67,29 @@ def create_app() -> FastAPI:
         impact_k=settings.insights_impact_k,
         impact_cap=settings.insights_impact_cap,
     )
-    compute_insights = ComputeInsights(feature_repo, model_runner, insight_repo, audit_logger)
+    compute_insights = ComputeInsights(
+        feature_repo,
+        model_runner,
+        insight_repo,
+        audit_logger,
+        proposal_store,
+        insight_planner,
+        insight_history,
+        domain=settings.domain,
+        max_actions_allowed=settings.max_actions_allowed,
+        llm_provider=settings.llm_provider,
+        llm_model=settings.llm_model,
+    )
+    explain_insight = ExplainInsight(
+        insight_repo=insight_repo,
+        proposal_store=proposal_store,
+        explainer=copilot_explainer,
+    )
+    ask_copilot = AskCopilot(
+        explain_insight=explain_insight,
+        audit_logger=audit_logger,
+        insight_reader=insight_reader,
+    )
     get_insights = GetInsights(insight_repo)
     get_summary = GetSummary(insight_repo)
     record_action = RecordAction(insight_repo, audit_logger)
@@ -82,6 +100,7 @@ def create_app() -> FastAPI:
     container = AppContainer(
         settings=settings,
         ask_copilot=ask_copilot,
+        explain_insight=explain_insight,
         ingest_rag=ingest_rag,
         compute_insights=compute_insights,
         get_insights=get_insights,
@@ -91,7 +110,7 @@ def create_app() -> FastAPI:
         recompute_baselines=recompute_baselines,
     )
 
-    app = FastAPI(title="AI Copilot Service", version="0.2.0")
+    app = FastAPI(title="AI Copilot Service", version="0.3.0")
     app.state.container = container
     app.include_router(health_router)
     app.include_router(copilot_router)

@@ -1,15 +1,18 @@
 import time
 import uuid
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
-from application.copilot.ports.intent_classifier import IntentClassifierPort
 from application.copilot.ports.insight_reader import InsightReaderPort, RelatedInsight
-from application.copilot.ports.rag_repository import RagRepositoryPort
-from application.copilot.ports.sql_catalog import SQLCatalogPort
-from application.copilot.ports.sql_executor import SQLExecutorPort
-from app.config import Settings
+from application.copilot.ports.copilot_explainer import CopilotExplainMode
+from application.copilot.use_cases.explain_insight import ExplainInsight
+
+
+_UUID_RE = re.compile(
+    r"(?P<uuid>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+)
 
 
 @dataclass(frozen=True)
@@ -29,19 +32,11 @@ class AskResult:
 class AskCopilot:
     def __init__(
         self,
-        settings: Settings,
-        intent_classifier: IntentClassifierPort,
-        sql_catalog: SQLCatalogPort,
-        sql_executor: SQLExecutorPort,
-        rag_repo: RagRepositoryPort,
+        explain_insight: ExplainInsight,
         audit_logger: AuditLoggerPort,
         insight_reader: InsightReaderPort,
     ) -> None:
-        self.settings = settings
-        self.intent_classifier = intent_classifier
-        self.sql_catalog = sql_catalog
-        self.sql_executor = sql_executor
-        self.rag_repo = rag_repo
+        self.explain_insight = explain_insight
         self.audit_logger = audit_logger
         self.insight_reader = insight_reader
 
@@ -59,43 +54,31 @@ class AskCopilot:
         data: list[dict[str, Any]] = []
         sources: list[dict[str, Any]] = []
         params: dict[str, Any] = {"project_id": project_id}
-
         if context:
+            # Se conserva por compatibilidad, pero Copilot v2 no explora datos por ventana.
             if context.get("date_from"):
                 params["date_from"] = context["date_from"]
             if context.get("date_to"):
                 params["date_to"] = context["date_to"]
 
-        intent_decision = self.intent_classifier.classify(question, params)
-        intent = intent_decision.intent
-        query_id = intent_decision.query_id
+        insight_id = _extract_uuid(question)
+        intent = "explainability"
+        query_id = None
 
         try:
-            if intent == "docs":
-                rag_results = self.rag_repo.search(project_id, question)
-                sources.append({"type": "rag", "doc_ids": rag_results.doc_ids, "top_k": rag_results.top_k})
-                answer = rag_results.answer
-                data = []
+            if not insight_id:
+                # Copilot v2: no hay chat libre. Respuesta determinística (deprecación controlada).
+                warnings.append("Copilot v2: /v1/ask ya no soporta chat libre. Usá endpoints /v1/copilot/... para explainability.")
+                answer = "Copilot v2 solo explica insights existentes. Proveé un insight_id para obtener explicación."
+                intent = "deprecated"
             else:
-                if not query_id:
-                    warnings.append("No se pudo determinar query_id para la pregunta.")
-                    answer = "No se pudo resolver la consulta solicitada."
-                else:
-                    entry = self.sql_catalog.get_entry(query_id)
-                    params = entry.validate_params(params)
-                    if not entry.implemented:
-                        warnings.append("Query no implementada: falta schema real.")
-                        answer = "Query no implementada en el MVP."
-                    else:
-                        data = self.sql_executor.execute(
-                            sql_template=entry.sql_template,
-                            params=params,
-                            statement_timeout_ms=self.settings.statement_timeout_ms,
-                            max_limit=self.settings.max_limit,
-                            default_limit=self.settings.default_limit,
-                        )
-                        answer = "Consulta ejecutada correctamente."
-                    sources.append({"type": "sql", "query_id": query_id, "params": params})
+                mode = _infer_mode(question)
+                params["insight_id"] = insight_id
+                params["mode"] = mode
+                result = self.explain_insight.handle(project_id=project_id, insight_id=insight_id, mode=mode)
+                answer = result["explanation"]["human_readable"]
+                sources.append({"type": "insight", "insight_id": insight_id})
+                sources.append({"type": "proposal", "available": result.get("proposal") is not None})
 
             duration_ms = int((time.time() - started) * 1000)
             self.audit_logger.log(
@@ -157,3 +140,19 @@ class AskCopilot:
                 related_insights_count=0,
                 related_insights=[],
             )
+
+
+def _extract_uuid(text: str) -> str | None:
+    match = _UUID_RE.search(text)
+    if not match:
+        return None
+    return match.group("uuid")
+
+
+def _infer_mode(question: str) -> CopilotExplainMode:
+    q = question.lower()
+    if any(token in q for token in ["por qué", "por que", "why", "causa"]):
+        return "why"
+    if any(token in q for token in ["next", "próximo", "proximo", "siguientes", "pasos"]):
+        return "next_steps"
+    return "explain"

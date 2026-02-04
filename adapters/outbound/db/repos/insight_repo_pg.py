@@ -132,6 +132,24 @@ class InsightRepositoryPG(InsightRepositoryPort):
                 rows = cur.fetchall()
         return [_row_to_insight(dict(row)) for row in rows]
 
+    def get_by_id(self, project_id: str, insight_id: str) -> Insight | None:
+        with self.session.connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM ai_insights
+                    WHERE project_id = %(project_id)s
+                      AND id = %(insight_id)s::uuid
+                    LIMIT 1
+                    """,
+                    {"project_id": project_id, "insight_id": insight_id},
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return _row_to_insight(dict(row))
+
     def get_summary(self, project_id: str) -> InsightSummary:
         with self.session.connect() as conn:
             with conn.cursor() as cur:
