@@ -42,7 +42,7 @@ services:
     environment:
       - APP_NAME=ai-copilot-service
       - APP_ENV=local
-      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/ponti_api_db?sslmode=disable
+      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/new_ponti_db_dev?sslmode=disable
       - AI_SERVICE_KEYS=servicekey123
       - STATEMENT_TIMEOUT_MS=20000
       - MAX_LIMIT=200
