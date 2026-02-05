@@ -15,6 +15,11 @@ def test_executor_requires_dsn() -> None:
         embedding_dim=8,
         rag_top_k=3,
         llm_provider="stub",
+        llm_model="stub",
+        llm_api_key=None,
+        llm_base_url=None,
+        llm_timeout_s=5.0,
+        llm_max_retries=1,
         insights_ratio_high=0.5,
         insights_ratio_medium=0.2,
         insights_spike_ratio=1.5,
@@ -28,6 +33,8 @@ def test_executor_requires_dsn() -> None:
         insights_baseline_lock_key=41001,
         insights_recompute_lock_key=41002,
         insights_baseline_batch_size=200,
+        domain="agriculture",
+        max_actions_allowed=4,
     )
     executor = SQLExecutor(settings)
     with pytest.raises(ValueError):

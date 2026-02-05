@@ -5,8 +5,11 @@ from datetime import datetime, timezone
 
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.insights.ports.feature_repository import FeatureRepositoryPort
+from application.insights.ports.insight_history import InsightHistoryPort
 from application.insights.ports.insight_repository import InsightRepositoryPort
+from application.insights.ports.insight_planner import InsightPlannerPort
 from application.insights.ports.model_runner import ModelRunnerPort
+from application.insights.ports.proposal_store import ProposalStorePort
 
 
 class ComputeInsights:
@@ -16,11 +19,25 @@ class ComputeInsights:
         model_runner: ModelRunnerPort,
         insight_repo: InsightRepositoryPort,
         audit_logger: AuditLoggerPort,
+        proposal_store: ProposalStorePort,
+        insight_planner: InsightPlannerPort,
+        insight_history: InsightHistoryPort,
+        domain: str,
+        max_actions_allowed: int,
+        llm_provider: str,
+        llm_model: str,
     ) -> None:
         self.feature_repo = feature_repo
         self.model_runner = model_runner
         self.insight_repo = insight_repo
         self.audit_logger = audit_logger
+        self.proposal_store = proposal_store
+        self.insight_planner = insight_planner
+        self.insight_history = insight_history
+        self.domain = domain
+        self.max_actions_allowed = max_actions_allowed
+        self.llm_provider = llm_provider
+        self.llm_model = llm_model
 
     def handle(
         self,
@@ -60,6 +77,10 @@ class ComputeInsights:
                     )
                 )
             created = self.insight_repo.upsert_many(filtered)
+
+            # Insights v2: análisis LLM + persistencia de propuesta (fail-open).
+            for insight in filtered:
+                self._maybe_generate_proposal(project_id=project_id, insight=insight)
         except Exception as exc:  # noqa: BLE001
             status = "error"
             error = str(exc)
@@ -82,3 +103,81 @@ class ComputeInsights:
         )
 
         return {"request_id": request_id, "computed": computed, "insights_created": created}
+
+    def _maybe_generate_proposal(self, *, project_id: str, insight) -> None:
+        # Gating determinístico (antes del LLM).
+        if insight.status != "new":
+            return
+        if int(insight.severity) < 70:
+            return
+        evidence = insight.evidence if isinstance(insight.evidence, dict) else {}
+        n_samples = int(evidence.get("n_samples", 0) or 0)
+        if n_samples < 30:
+            return
+        if self.proposal_store.get_latest_ok(insight.id) is not None:
+            return
+
+        history = self.insight_history.get_history(project_id, insight.entity_type, insight.entity_id, limit=6)
+        previous = [
+            {
+                "id": item.id,
+                "type": item.type,
+                "severity": item.severity,
+                "status": item.status,
+                "computed_at": item.computed_at.isoformat(),
+                "title": item.title,
+            }
+            for item in history
+            if item.id != insight.id
+        ][:5]
+        actions = self.insight_history.get_recent_actions(project_id, limit=5)
+        previous_actions = [
+            {
+                "insight_id": a.insight_id,
+                "user_id": a.user_id,
+                "action": a.action,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in actions
+        ]
+        historical_context = {
+            "previous_insights": previous,
+            "previous_actions": previous_actions,
+            "outcomes": {},
+        }
+
+        prompt_version = getattr(self.insight_planner, "prompt_version", "unknown")
+        tools_catalog_version = getattr(self.insight_planner, "tools_catalog_version", "unknown")
+        provider_name = self.llm_provider or "unknown"
+        model_name = self.llm_model or "unknown"
+
+        try:
+            proposal = self.insight_planner.plan(
+                insight=insight,
+                historical_context=historical_context,
+                domain=self.domain,
+                max_actions_allowed=self.max_actions_allowed,
+            )
+            self.proposal_store.insert(
+                insight_id=insight.id,
+                project_id=project_id,
+                proposal=proposal,
+                prompt_version=str(prompt_version),
+                tools_catalog_version=str(tools_catalog_version),
+                llm_provider=str(provider_name),
+                llm_model=str(model_name),
+                status="ok",
+                error_message=None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.proposal_store.insert(
+                insight_id=insight.id,
+                project_id=project_id,
+                proposal={},
+                prompt_version=str(prompt_version),
+                tools_catalog_version=str(tools_catalog_version),
+                llm_provider=str(provider_name),
+                llm_model=str(model_name),
+                status="error",
+                error_message=str(exc),
+            )

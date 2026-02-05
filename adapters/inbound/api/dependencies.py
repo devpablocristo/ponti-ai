@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from application.copilot.use_cases.ask_copilot import AskCopilot
+from application.copilot.use_cases.explain_insight import ExplainInsight
 from application.copilot.use_cases.ingest_rag import IngestRag
 from application.insights.use_cases.compute_insights import ComputeInsights
 from application.insights.use_cases.get_insights import GetInsights
@@ -17,6 +18,7 @@ from app.config import Settings
 class AppContainer:
     settings: Settings
     ask_copilot: AskCopilot
+    explain_insight: ExplainInsight
     ingest_rag: IngestRag
     compute_insights: ComputeInsights
     get_insights: GetInsights

@@ -4,8 +4,10 @@ TLDR:
 3. `make up`
 4. `make run`
 
-# AI Copilot Service (MVP)
+# AI Copilot Service (v2)
 Servicio AI read-only con FastAPI + PostgreSQL + pgvector. Arquitectura hexagonal liviana.
+
+v2: Insights genera propuestas operativas (persistidas) via LLM con gating determinístico. Copilot pasa a ser capa de explainability (no chat libre).
 
 ## Requisitos
 - Python 3.12+
@@ -21,6 +23,32 @@ cp .env.example .env
 make up
 ```
 
+### Ollama (local)
+Este repo puede usar Ollama en local (Docker) como LLM provider.
+
+1. Levantar Ollama:
+```bash
+docker compose up -d ollama
+```
+
+2. Descargar un modelo (ejemplo):
+```bash
+docker compose exec ollama ollama pull llama3.1
+```
+
+3. Configurar `.env` para desarrollo local (si corrés la API fuera de Docker):
+- `LLM_PROVIDER=ollama`
+- `LLM_MODEL=llama3.1`
+- `LLM_BASE_URL=http://localhost:11434`
+
+Si corrés `ai-copilot` dentro de `docker compose`, se usa `LLM_BASE_URL=http://ollama:11434`.
+
+### Google (cloud)
+Para correr en la nube con Google AI Studio (Gemini API):
+- `LLM_PROVIDER=google_ai_studio`
+- `LLM_MODEL=gemini-flash-latest` (o cualquier `models/...` soportado)
+- `LLM_API_KEY` via secret/variable de entorno del runtime (no en git)
+
 ## Ejecutar API en local
 ```bash
 make run
@@ -30,7 +58,10 @@ make run
 - `GET /healthz`
 - `GET /readyz`
 - `GET /metrics`
-- `POST /v1/ask`
+- `POST /v1/ask` (deprecado: wrapper de explainability, no chat libre)
+- `GET /v1/copilot/insights/{insight_id}/explain`
+- `GET /v1/copilot/insights/{insight_id}/why`
+- `GET /v1/copilot/insights/{insight_id}/next-steps`
 - `POST /v1/rag/ingest`
 - `POST /v1/insights/compute`
 - `GET /v1/insights/{entity_type}/{entity_id}`
@@ -68,7 +99,14 @@ Salida extendida por insight:
 - `action_json` con `action_type`, `action_params`, `suggested_due_date`, `cta_label`
 
 Integracion Copilot:
-`/v1/ask` incluye `related_insights_count` y `related_insights` (top 3).
+`/v1/ask` se mantiene por compatibilidad pero ya no es chat: solo explica insights existentes cuando se provee un `insight_id` (UUID) en el texto.
+
+Explainability:
+- `GET /v1/copilot/insights/{insight_id}/explain|why|next-steps`
+
+Propuestas (v2):
+- Insights aplica gating determinístico (severity>=70, n_samples>=30, status=new, sin propuesta ok previa)
+- Si pasa, llama a LLM planner y persiste la propuesta asociada al insight (audit/dedupe/repro).
 
 ## Diagrama de flujo
 ```
@@ -120,9 +158,16 @@ curl -s -X POST http://localhost:8090/v1/ask \
   -H "X-USER-ID: 123" \
   -H "X-PROJECT-ID: demo-project" \
   -d '{
-    "question": "Necesito el resumen del proyecto",
-    "context": { "date_from": "2025-01-01", "date_to": "2025-12-31" }
+    "question": "Explicame el insight 7e1bdc3e-6ec0-5814-9d7d-50c1d3486612",
+    "context": {}
   }'
+```
+
+```bash
+curl -s http://localhost:8090/v1/copilot/insights/7e1bdc3e-6ec0-5814-9d7d-50c1d3486612/explain \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: 123" \
+  -H "X-PROJECT-ID: demo-project"
 ```
 
 ```bash

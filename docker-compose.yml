@@ -15,6 +15,14 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
   ai-migrate:
     image: migrate/migrate:v4.17.1
     depends_on:
@@ -29,17 +37,21 @@ services:
     depends_on:
       ai-db:
         condition: service_healthy
+      ollama:
+        condition: service_started
     environment:
       - APP_NAME=ai-copilot-service
       - APP_ENV=local
-      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/ponti_api_db?sslmode=disable
+      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/new_ponti_db_dev?sslmode=disable
       - AI_SERVICE_KEYS=servicekey123
       - STATEMENT_TIMEOUT_MS=20000
       - MAX_LIMIT=200
       - DEFAULT_LIMIT=50
       - EMBEDDING_DIM=1536
       - RAG_TOP_K=5
-      - LLM_PROVIDER=stub
+      - LLM_PROVIDER=ollama
+      - LLM_BASE_URL=http://ollama:11434
+      - LLM_MODEL=llama3.1
       - INSIGHTS_RATIO_HIGH=0.5
       - INSIGHTS_RATIO_MEDIUM=0.2
       - INSIGHTS_SPIKE_RATIO=1.5
@@ -69,3 +81,4 @@ services:
 
 volumes:
   ai-db_data:
+  ollama_data:

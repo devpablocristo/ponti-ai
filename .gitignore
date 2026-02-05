@@ -15,10 +15,10 @@ app/main/bin/
 # Local Configuration Files
 # Local config can include sensitive or environment-specific settings and should not be in version control.
 # Uncomment the following line if you decide to exclude environment configs
-# .env
-# .env.*
-# .env.local
-# .env.*.local
+.env
+.env.*
+.env.local
+.env.*.local
 
 # System-generated Files
 # These files are created by the operating system or the user's environment and can interfere with others.

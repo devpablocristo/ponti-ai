@@ -18,6 +18,9 @@ class InsightRepositoryPort(Protocol):
     def get_by_entity(self, project_id: str, entity_type: str, entity_id: str) -> list[Insight]:
         ...
 
+    def get_by_id(self, project_id: str, insight_id: str) -> Insight | None:
+        ...
+
     def get_summary(self, project_id: str) -> InsightSummary:
         ...
 
