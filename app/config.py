@@ -51,6 +51,18 @@ class Settings:
     domain: str
     max_actions_allowed: int
 
+    # ML (Machine Learning)
+    ml_enabled: bool
+    ml_model_type: str
+    ml_retrain_lock_key: int
+    ml_rollout_percent: int
+    ml_enabled_project_ids: tuple[str, ...]
+    ml_shadow_mode: bool
+    ml_auto_promote: bool
+    ml_auto_retrain_min_hours: int
+    ml_promotion_min_alert_rate_improvement: float
+    ml_promotion_min_samples_ratio: float
+
     @property
     def cohort_config(self) -> CohortConfig:
         return CohortConfig(
@@ -90,6 +102,13 @@ def _get_optional_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError as exc:
         raise ValueError(f"{name} debe ser numerico") from exc
+
+
+def _get_optional_csv(name: str, default: str = "") -> tuple[str, ...]:
+    raw = _get_optional(name, default)
+    if raw is None:
+        return tuple()
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
 
 
 def _get_required_float(name: str) -> float:
@@ -151,4 +170,14 @@ def load_settings() -> Settings:
         insights_baseline_batch_size=_get_required_int("INSIGHTS_BASELINE_BATCH_SIZE"),
         domain=_get_optional("DOMAIN", "agriculture") or "agriculture",
         max_actions_allowed=_get_optional_int("MAX_ACTIONS_ALLOWED", 4),
+        ml_enabled=_get_optional("ML_ENABLED", "false") == "true",
+        ml_model_type=_get_optional("ML_MODEL_TYPE", "isolation_forest") or "isolation_forest",
+        ml_retrain_lock_key=_get_optional_int("ML_RETRAIN_LOCK_KEY", 41003),
+        ml_rollout_percent=max(0, min(100, _get_optional_int("ML_ROLLOUT_PERCENT", 100))),
+        ml_enabled_project_ids=_get_optional_csv("ML_ENABLED_PROJECT_IDS", ""),
+        ml_shadow_mode=_get_optional("ML_SHADOW_MODE", "false") == "true",
+        ml_auto_promote=_get_optional("ML_AUTO_PROMOTE", "true") == "true",
+        ml_auto_retrain_min_hours=max(1, _get_optional_int("ML_AUTO_RETRAIN_MIN_HOURS", 24)),
+        ml_promotion_min_alert_rate_improvement=max(0.0, _get_optional_float("ML_PROMOTION_MIN_ALERT_RATE_IMPROVEMENT", 0.01)),
+        ml_promotion_min_samples_ratio=max(0.0, _get_optional_float("ML_PROMOTION_MIN_SAMPLES_RATIO", 0.8)),
     )

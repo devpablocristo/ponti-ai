@@ -71,3 +71,56 @@ class JobRecomputeBaselinesResponse(BaseModel):
     job_run_id: str
     cohort_saved: int
     project_saved: int
+
+
+class JobRetrainMLRequest(BaseModel):
+    version: str | None = None
+    activate: bool = True
+    auto_promote: bool = True
+    hyperparameters: dict[str, Any] | None = None
+
+
+class JobRetrainMLResponse(BaseModel):
+    status: str
+    job_run_id: str
+    model_version: str | None = None
+    active_version: str | None = None
+    promoted: bool | None = None
+    promotion_reason: str | None = None
+    training_time_seconds: float | None = None
+    metrics: dict[str, float] = Field(default_factory=dict)
+    error: str | None = None
+
+
+class MLStatusResponse(BaseModel):
+    enabled: bool
+    initialized: bool
+    model_type: str
+    models_dir: str | None = None
+    has_active_model: bool
+    active_version: str | None = None
+    available_versions: list[str] = Field(default_factory=list)
+    rollout_percent: int = 100
+    rollout_allowlist_size: int = 0
+    last_drift_score: float | None = None
+    last_drift_level: str | None = None
+    shadow_mode: bool = False
+    active_history: list[str] = Field(default_factory=list)
+    auto_promote: bool = True
+    auto_retrain_min_hours: int = 24
+
+
+class MLActivateRequest(BaseModel):
+    version: str = Field(..., min_length=1)
+
+
+class MLRollbackRequest(BaseModel):
+    target_version: str | None = None
+
+
+class MLVersionChangeResponse(BaseModel):
+    status: str
+    previous_active_version: str | None = None
+    active_version: str | None = None
+    rollback_target_version: str | None = None
+    error: str | None = None

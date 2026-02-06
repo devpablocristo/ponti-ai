@@ -8,7 +8,7 @@ from domain.copilot.entities import RagSearchResult
 
 def search_documents(settings: Settings, project_id: str, question: str) -> RagSearchResult:
     session = DBSession(settings)
-    vector = embed_texts([question], settings.embedding_dim)[0]
+    vector = embed_texts(settings, [question], settings.embedding_dim)[0]
     doc_ids: list[str] = []
 
     with session.connect() as conn:

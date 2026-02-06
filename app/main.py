@@ -6,6 +6,7 @@ from adapters.inbound.api.routes.copilot import router as copilot_router
 from adapters.inbound.api.routes.health import router as health_router
 from adapters.inbound.api.routes.insights import router as insights_router
 from adapters.inbound.api.routes.jobs import router as jobs_router
+from adapters.inbound.api.routes.ml import router as ml_router
 from adapters.outbound.db.repos.audit_logger_pg import AuditLoggerPG
 from adapters.outbound.db.repos.insight_reader_pg import InsightReaderPG
 from adapters.outbound.db.repos.insight_history_pg import InsightHistoryPG
@@ -22,7 +23,6 @@ from adapters.outbound.models.anomaly_runner import AnomalyRunner
 from adapters.outbound.sql.baseline_computer_pg import BaselineComputerPG
 from adapters.outbound.sql.project_repo_pg import ProjectRepositoryPG
 from app.config import load_settings
-from application.copilot.use_cases.ask_copilot import AskCopilot
 from application.copilot.use_cases.explain_insight import ExplainInsight
 from application.copilot.use_cases.ingest_rag import IngestRag
 from application.insights.use_cases.compute_insights import ComputeInsights
@@ -31,6 +31,25 @@ from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
 from application.insights.use_cases.recompute_active import RecomputeActive
 from application.insights.use_cases.recompute_baselines import RecomputeBaselines
+
+
+def _create_ml_facade(settings):
+    """
+    Crea el MLFacade si ML esta habilitado.
+
+    Retorna None si ML no esta habilitado o hay error.
+    Esto permite que la app funcione sin ML.
+    """
+    if not settings.ml_enabled:
+        return None
+
+    try:
+        from ml import MLFacade
+        return MLFacade.from_settings(settings)
+    except Exception as e:
+        # Log error pero no fallar - ML es opcional
+        print(f"[WARN] No se pudo inicializar ML: {e}")
+        return None
 
 
 def create_app() -> FastAPI:
@@ -55,6 +74,7 @@ def create_app() -> FastAPI:
     llm_client = build_llm_client(settings)
     insight_planner = InsightPlannerLLM(llm_client)
     copilot_explainer = CopilotExplainerLLM(llm_client)
+    ml_facade = _create_ml_facade(settings)
 
     model_runner = AnomalyRunner(
         baseline_repo=baseline_repo,
@@ -79,16 +99,13 @@ def create_app() -> FastAPI:
         max_actions_allowed=settings.max_actions_allowed,
         llm_provider=settings.llm_provider,
         llm_model=settings.llm_model,
+        ml_detector=ml_facade,
+        ml_shadow_mode=settings.ml_shadow_mode,
     )
     explain_insight = ExplainInsight(
         insight_repo=insight_repo,
         proposal_store=proposal_store,
         explainer=copilot_explainer,
-    )
-    ask_copilot = AskCopilot(
-        explain_insight=explain_insight,
-        audit_logger=audit_logger,
-        insight_reader=insight_reader,
     )
     get_insights = GetInsights(insight_repo)
     get_summary = GetSummary(insight_repo)
@@ -99,7 +116,6 @@ def create_app() -> FastAPI:
 
     container = AppContainer(
         settings=settings,
-        ask_copilot=ask_copilot,
         explain_insight=explain_insight,
         ingest_rag=ingest_rag,
         compute_insights=compute_insights,
@@ -108,6 +124,8 @@ def create_app() -> FastAPI:
         record_action=record_action,
         recompute_active=recompute_active,
         recompute_baselines=recompute_baselines,
+        job_lock=job_lock,
+        ml_facade=ml_facade,
     )
 
     app = FastAPI(title="AI Copilot Service", version="0.3.0")
@@ -116,6 +134,7 @@ def create_app() -> FastAPI:
     app.include_router(copilot_router)
     app.include_router(insights_router)
     app.include_router(jobs_router)
+    app.include_router(ml_router)
     return app
 
 

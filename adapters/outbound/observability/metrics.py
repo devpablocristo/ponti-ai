@@ -20,7 +20,7 @@ def observe_ms(name: str, value_ms: int) -> None:
 
 def snapshot() -> dict[str, dict[str, float]]:
     with _lock:
-        counters = dict(_counters)
+        counters = {k: float(v) for k, v in _counters.items()}
         timers = {}
         for key, values in _timers_ms.items():
             if not values:

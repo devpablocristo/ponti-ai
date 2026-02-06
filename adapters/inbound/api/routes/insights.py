@@ -28,6 +28,8 @@ def compute_insights(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
     inc_counter("insights.compute.count", 1)
+    inc_counter("insights.compute.rules_created", int(result.get("rules_insights_created", 0)))
+    inc_counter("insights.compute.ml_created", int(result.get("ml_insights_created", 0)))
     log_event(
         "insights.compute",
         {
@@ -35,6 +37,8 @@ def compute_insights(
             "project_id": auth.project_id,
             "computed": result["computed"],
             "created": result["insights_created"],
+            "rules_created": int(result.get("rules_insights_created", 0)),
+            "ml_created": int(result.get("ml_insights_created", 0)),
             "status": "ok",
         },
     )

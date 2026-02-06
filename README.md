@@ -1,7 +1,7 @@
 TLDR:
-1. `cp .env.example .env`
-2. Configurar `AI_SERVICE_KEYS` y parametros de insights en `.env`
-3. `make up`
+1. Configurar `AI_SERVICE_KEYS` y parametros de insights en `.env`
+2. `make up`
+3. `make train-ml`
 4. `make run`
 
 # AI Copilot Service (v2)
@@ -14,9 +14,7 @@ v2: Insights genera propuestas operativas (persistidas) via LLM con gating deter
 - Docker + Docker Compose
 
 ## Configuracion local
-```bash
-cp .env.example .env
-```
+Editar `.env` con las variables necesarias (DB_DSN, AI_SERVICE_KEYS, LLM_*, etc.).
 
 ## Levantar servicios con Docker
 ```bash
@@ -34,6 +32,7 @@ docker compose up -d ollama
 2. Descargar un modelo (ejemplo):
 ```bash
 docker compose exec ollama ollama pull llama3.1
+docker compose exec ollama ollama pull nomic-embed-text
 ```
 
 3. Configurar `.env` para desarrollo local (si corrés la API fuera de Docker):
@@ -54,11 +53,117 @@ Para correr en la nube con Google AI Studio (Gemini API):
 make run
 ```
 
+## ML operativo (reglas + modelo)
+El servicio combina insights de reglas con insights de ML cuando hay un modelo activo.
+
+Variables clave:
+- `ML_ENABLED=true`
+- `ML_MODEL_TYPE=isolation_forest`
+- `ML_MODELS_DIR=ml_models` (local) o `/app/ml_models` (docker)
+- `ML_ROLLOUT_PERCENT=100` (0-100, gating gradual por proyecto)
+- `ML_ENABLED_PROJECT_IDS=` (lista CSV opcional para allowlist estricta)
+- `ML_SHADOW_MODE=false` (si `true`, persiste insights ML como `status=shadow` y no aparecen en listados de usuario)
+- `ML_AUTO_PROMOTE=true` (promueve solo si el modelo nuevo mejora la calibracion)
+- `ML_AUTO_RETRAIN_MIN_HOURS=24` (evita reentrenar demasiado seguido en modo automatico)
+- `ML_PROMOTION_MIN_ALERT_RATE_IMPROVEMENT=0.01`
+- `ML_PROMOTION_MIN_SAMPLES_RATIO=0.8`
+- `EMBEDDING_PROVIDER=ollama` y `EMBEDDING_MODEL=nomic-embed-text` (embeddings reales para RAG)
+
+Entrenar y activar modelo:
+```bash
+make train-ml
+```
+
+Con `docker compose`, los modelos quedan persistidos en el volumen `ai-ml-models`.
+
+Contrato de features ML (`features-v1`):
+- Training e inference usan el mismo catalogo SQL de features del runtime.
+- El vector de entrada se normaliza con el contrato `{feature}_{window}` y zero-fill para faltantes.
+- `project_id` se trata como `bigint`/texto canonico (sin casts a `uuid`).
+
+Model registry (DB + filesystem):
+- Artefactos (`model.joblib`, `pipeline.joblib`) se guardan en filesystem.
+- Metadata/versionado/activacion se registran en `ai_ml_models` (PostgreSQL).
+- `active.txt` se mantiene como fallback de compatibilidad.
+
+Observabilidad ML:
+- `GET /v1/ml/status` expone `rollout_percent`, `rollout_allowlist_size`, `last_drift_score`, `last_drift_level`.
+- En `/metrics` se incrementan contadores `ml.drift.low|medium|high.count`.
+- En `/metrics` se incrementan contadores `ml.rollout.skipped.count` e `insights.compute.ml_shadow.count`.
+
+Calibracion supervisada:
+- Durante training, si hay feedback suficiente en `ai_insight_actions`, se calcula `calibrated_threshold`.
+- En inference, si el modelo activo tiene ese valor, se usa en lugar de `ML_ANOMALY_THRESHOLD`.
+
+Estado de ML:
+```bash
+curl -s http://localhost:8090/v1/ml/status \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: 123" \
+  -H "X-PROJECT-ID: demo-project"
+```
+
+Activar una version puntual:
+```bash
+curl -s -X POST http://localhost:8090/v1/ml/activate \
+  -H "Content-Type: application/json" \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: admin" \
+  -H "X-PROJECT-ID: demo-project" \
+  -d '{"version":"v1_20260206_120000"}'
+```
+
+Rollback a version previa (automatica):
+```bash
+curl -s -X POST http://localhost:8090/v1/ml/rollback \
+  -H "Content-Type: application/json" \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: admin" \
+  -H "X-PROJECT-ID: demo-project" \
+  -d '{}'
+```
+
+Rollback a version especifica:
+```bash
+curl -s -X POST http://localhost:8090/v1/ml/rollback \
+  -H "Content-Type: application/json" \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: admin" \
+  -H "X-PROJECT-ID: demo-project" \
+  -d '{"target_version":"v1_20260201_090000"}'
+```
+
+Retrain online (con lock):
+```bash
+curl -s -X POST http://localhost:8090/v1/jobs/retrain-ml \
+  -H "Content-Type: application/json" \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: scheduler" \
+  -H "X-PROJECT-ID: demo-project" \
+  -d '{
+    "version": "v1_manual",
+    "activate": true,
+    "hyperparameters": { "contamination": 0.05, "n_estimators": 100 }
+  }'
+```
+
+Retrain automatico (solo si el modelo activo esta "viejo"):
+```bash
+curl -s -X POST http://localhost:8090/v1/jobs/retrain-ml-if-needed \
+  -H "Content-Type: application/json" \
+  -H "X-SERVICE-KEY: servicekey123" \
+  -H "X-USER-ID: scheduler" \
+  -H "X-PROJECT-ID: demo-project" \
+  -d '{"auto_promote": true}'
+```
+
 ## Endpoints
 - `GET /healthz`
 - `GET /readyz`
 - `GET /metrics`
-- `POST /v1/ask` (deprecado: wrapper de explainability, no chat libre)
+- `GET /v1/ml/status`
+- `POST /v1/ml/activate`
+- `POST /v1/ml/rollback`
 - `GET /v1/copilot/insights/{insight_id}/explain`
 - `GET /v1/copilot/insights/{insight_id}/why`
 - `GET /v1/copilot/insights/{insight_id}/next-steps`
@@ -69,6 +174,12 @@ make run
 - `POST /v1/insights/{insight_id}/actions`
 - `POST /v1/jobs/recompute-active`
 - `POST /v1/jobs/recompute-baselines`
+- `POST /v1/jobs/retrain-ml`
+- `POST /v1/jobs/retrain-ml-if-needed`
+
+## TODO acordado
+- Observabilidad avanzada (SLO/alertas/dashboards externos) queda en TODO.
+- Runbook operativo formal (incidentes + rollback/recovery paso a paso) queda en TODO.
 
 ## Headers requeridos
 ```
@@ -97,9 +208,6 @@ Salida extendida por insight:
 - `confidence`
 - `dedupe_key`, `cooldown_until`
 - `action_json` con `action_type`, `action_params`, `suggested_due_date`, `cta_label`
-
-Integracion Copilot:
-`/v1/ask` se mantiene por compatibilidad pero ya no es chat: solo explica insights existentes cuando se provee un `insight_id` (UUID) en el texto.
 
 Explainability:
 - `GET /v1/copilot/insights/{insight_id}/explain|why|next-steps`
@@ -149,18 +257,6 @@ curl -s http://localhost:8090/healthz
 
 ```bash
 curl -s http://localhost:8090/readyz
-```
-
-```bash
-curl -s -X POST http://localhost:8090/v1/ask \
-  -H "Content-Type: application/json" \
-  -H "X-SERVICE-KEY: servicekey123" \
-  -H "X-USER-ID: 123" \
-  -H "X-PROJECT-ID: demo-project" \
-  -d '{
-    "question": "Explicame el insight 7e1bdc3e-6ec0-5814-9d7d-50c1d3486612",
-    "context": {}
-  }'
 ```
 
 ```bash
@@ -217,3 +313,8 @@ curl -s -X POST http://localhost:8090/v1/jobs/recompute-active \
 ```bash
 make test
 ```
+
+Métricas relevantes en `/metrics`:
+- `insights.compute.count`
+- `insights.compute.rules_created`
+- `insights.compute.ml_created`
