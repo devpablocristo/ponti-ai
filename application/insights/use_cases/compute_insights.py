@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.insights.ports.feature_repository import FeatureRepositoryPort
 from application.insights.ports.insight_history import InsightHistoryPort
+from application.insights.ports.ml_detector import MLDetectorPort
 from application.insights.ports.insight_repository import InsightRepositoryPort
 from application.insights.ports.insight_planner import InsightPlannerPort
 from application.insights.ports.model_runner import ModelRunnerPort
 from application.insights.ports.proposal_store import ProposalStorePort
+from adapters.outbound.observability.metrics import inc_counter
 
 
 class ComputeInsights:
@@ -26,6 +28,8 @@ class ComputeInsights:
         max_actions_allowed: int,
         llm_provider: str,
         llm_model: str,
+        ml_detector: MLDetectorPort | None = None,
+        ml_shadow_mode: bool = False,
     ) -> None:
         self.feature_repo = feature_repo
         self.model_runner = model_runner
@@ -38,6 +42,8 @@ class ComputeInsights:
         self.max_actions_allowed = max_actions_allowed
         self.llm_provider = llm_provider
         self.llm_model = llm_model
+        self.ml_detector = ml_detector
+        self.ml_shadow_mode = ml_shadow_mode
 
     def handle(
         self,
@@ -52,13 +58,22 @@ class ComputeInsights:
         error = None
         computed = 0
         created = 0
+        rules_created = 0
+        ml_created = 0
 
         try:
             features = self.feature_repo.fetch_features(project_id)
             computed = len(features)
             insights = self.model_runner.compute(project_id, features)
+            if self.ml_detector is not None:
+                try:
+                    insights.extend(self.ml_detector.detect_anomalies(project_id, features))
+                except Exception:  # noqa: BLE001
+                    # Fail-open: el flujo de insights no depende de ML.
+                    pass
             now = datetime.now(timezone.utc)
             filtered: list = []
+            shadowed_count = 0
             for insight in insights:
                 if insight.dedupe_key:
                     existing = self.insight_repo.get_active_by_dedupe(
@@ -69,6 +84,10 @@ class ComputeInsights:
                     )
                     if existing and existing.cooldown_until and existing.cooldown_until > now:
                         continue
+                is_ml_insight = str(insight.rules_version).startswith("ml_") or str(insight.model_version).startswith("ml-")
+                if self.ml_shadow_mode and is_ml_insight:
+                    insight = replace(insight, status="shadow")
+                    shadowed_count += 1
                 filtered.append(
                     replace(
                         insight,
@@ -77,6 +96,14 @@ class ComputeInsights:
                     )
                 )
             created = self.insight_repo.upsert_many(filtered)
+            ml_created = sum(
+                1
+                for insight in filtered
+                if str(insight.rules_version).startswith("ml_") or str(insight.model_version).startswith("ml-")
+            )
+            rules_created = max(created - ml_created, 0)
+            if shadowed_count > 0:
+                inc_counter("insights.compute.ml_shadow.count", shadowed_count)
 
             # Insights v2: análisis LLM + persistencia de propuesta (fail-open).
             for insight in filtered:
@@ -94,7 +121,11 @@ class ComputeInsights:
                 question="insights_compute",
                 intent="insights",
                 query_id="compute",
-                params={"project_id": project_id},
+                params={
+                    "project_id": project_id,
+                    "rules_insights_created": rules_created,
+                    "ml_insights_created": ml_created,
+                },
                 duration_ms=duration_ms,
                 rows_count=created,
                 status=status,
@@ -102,7 +133,13 @@ class ComputeInsights:
             )
         )
 
-        return {"request_id": request_id, "computed": computed, "insights_created": created}
+        return {
+            "request_id": request_id,
+            "computed": computed,
+            "insights_created": created,
+            "rules_insights_created": rules_created,
+            "ml_insights_created": ml_created,
+        }
 
     def _maybe_generate_proposal(self, *, project_id: str, insight) -> None:
         # Gating determinístico (antes del LLM).

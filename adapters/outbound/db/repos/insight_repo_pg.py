@@ -125,6 +125,7 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     WHERE project_id = %(project_id)s
                       AND entity_type = %(entity_type)s
                       AND entity_id = %(entity_id)s
+                      AND status <> 'shadow'
                     ORDER BY computed_at DESC
                     """,
                     {"project_id": project_id, "entity_type": entity_type, "entity_id": entity_id},

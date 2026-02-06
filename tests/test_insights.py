@@ -4,6 +4,7 @@ from application.insights.ports.feature_repository import FeatureRepositoryPort,
 from application.insights.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
 from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
 from application.insights.ports.insight_planner import InsightPlannerPort
+from application.insights.ports.ml_detector import MLDetectorPort
 from application.insights.ports.model_runner import ModelRunnerPort
 from application.insights.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
 from application.insights.ports.proposal_store import ProposalStorePort, StoredProposal
@@ -231,6 +232,39 @@ class FakeHistory(InsightHistoryPort):
         return []
 
 
+class FakeMLDetector(MLDetectorPort):
+    def __init__(self, should_fail: bool = False) -> None:
+        self.should_fail = should_fail
+
+    def detect_anomalies(self, project_id: str, features: list[FeatureValue]) -> list[Insight]:
+        _ = features
+        if self.should_fail:
+            raise RuntimeError("ml_unavailable")
+        now = datetime.now(timezone.utc)
+        return [
+            Insight(
+                id="ins-ml-1",
+                project_id=project_id,
+                entity_type="project",
+                entity_id=project_id,
+                type="anomaly",
+                severity=85,
+                priority=85,
+                title="Alerta ML",
+                summary="Patron anomalo detectado por ML",
+                evidence={"feature": "cost_total", "n_samples": 80, "window": "all", "value": 40.0},
+                explanations={"rule": "ml_test"},
+                action={"suggestion": "Revisar"},
+                model_version="ml-v1",
+                features_version="features-v1",
+                computed_at=now,
+                valid_until=now + timedelta(days=7),
+                status="new",
+                dedupe_key="ml:anomaly",
+                cooldown_until=now + timedelta(days=7),
+            )
+        ]
+
 def test_compute_insights_creates_records() -> None:
     use_case = ComputeInsights(
         FakeFeatureRepo(),
@@ -247,6 +281,50 @@ def test_compute_insights_creates_records() -> None:
     )
     result = use_case.handle(project_id="p1", user_id="u1")
     assert result["insights_created"] == 1
+
+
+def test_compute_insights_includes_ml_records() -> None:
+    repo = FakeInsightRepo()
+    use_case = ComputeInsights(
+        FakeFeatureRepo(),
+        FakeModelRunner(),
+        repo,
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+        ml_detector=FakeMLDetector(),
+    )
+    result = use_case.handle(project_id="p1", user_id="u1")
+    assert result["insights_created"] == 2
+    assert result["rules_insights_created"] == 1
+    assert result["ml_insights_created"] == 1
+    assert any(item.id == "ins-ml-1" for item in repo.items)
+
+
+def test_compute_insights_continues_when_ml_fails() -> None:
+    use_case = ComputeInsights(
+        FakeFeatureRepo(),
+        FakeModelRunner(),
+        FakeInsightRepo(),
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+        ml_detector=FakeMLDetector(should_fail=True),
+    )
+    result = use_case.handle(project_id="p1", user_id="u1")
+    assert result["insights_created"] == 1
+    assert result["rules_insights_created"] == 1
+    assert result["ml_insights_created"] == 0
 
 
 def test_compute_insights_creates_proposal_when_gating_passes() -> None:

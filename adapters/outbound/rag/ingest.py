@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Any
 
@@ -22,19 +23,19 @@ def ingest_documents(settings: Settings, project_id: str, documents: list[Any]) 
                 cur.execute(
                     """
                     INSERT INTO ai_rag_documents (id, project_id, source, title, metadata, created_at)
-                    VALUES (%(id)s, %(project_id)s, %(source)s, %(title)s, %(metadata)s, NOW())
+                    VALUES (%(id)s, %(project_id)s, %(source)s, %(title)s, %(metadata)s::jsonb, NOW())
                     """,
                     {
                         "id": doc_id,
                         "project_id": project_id,
                         "source": doc.source,
                         "title": doc.title,
-                        "metadata": metadata,
+                        "metadata": json.dumps(metadata),
                     },
                 )
 
                 chunks = chunk_text(doc.content)
-                embeddings = embed_texts(chunks, settings.embedding_dim)
+                embeddings = embed_texts(settings, chunks, settings.embedding_dim)
 
                 for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
                     chunk_id = str(uuid.uuid4())

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fastapi import Request
 
-from application.copilot.use_cases.ask_copilot import AskCopilot
 from application.copilot.use_cases.explain_insight import ExplainInsight
 from application.copilot.use_cases.ingest_rag import IngestRag
 from application.insights.use_cases.compute_insights import ComputeInsights
@@ -11,13 +11,18 @@ from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
 from application.insights.use_cases.recompute_active import RecomputeActive
 from application.insights.use_cases.recompute_baselines import RecomputeBaselines
+from application.insights.ports.job_lock import JobLockPort
 from app.config import Settings
+
+# TYPE_CHECKING evita importar ml en runtime si no se usa
+# Esto mantiene las dependencias ML opcionales
+if TYPE_CHECKING:
+    from ml import MLFacade
 
 
 @dataclass(frozen=True)
 class AppContainer:
     settings: Settings
-    ask_copilot: AskCopilot
     explain_insight: ExplainInsight
     ingest_rag: IngestRag
     compute_insights: ComputeInsights
@@ -26,6 +31,9 @@ class AppContainer:
     record_action: RecordAction
     recompute_active: RecomputeActive
     recompute_baselines: RecomputeBaselines
+    job_lock: JobLockPort
+    # ML Facade (opcional, None si ML no esta habilitado)
+    ml_facade: "MLFacade | None" = None
 
 
 def get_container(request: Request) -> AppContainer:

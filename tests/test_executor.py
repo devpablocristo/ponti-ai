@@ -35,6 +35,16 @@ def test_executor_requires_dsn() -> None:
         insights_baseline_batch_size=200,
         domain="agriculture",
         max_actions_allowed=4,
+        ml_enabled=False,
+        ml_model_type="isolation_forest",
+        ml_retrain_lock_key=41003,
+        ml_rollout_percent=100,
+        ml_enabled_project_ids=(),
+        ml_shadow_mode=False,
+        ml_auto_promote=True,
+        ml_auto_retrain_min_hours=24,
+        ml_promotion_min_alert_rate_improvement=0.01,
+        ml_promotion_min_samples_ratio=0.8,
     )
     executor = SQLExecutor(settings)
     with pytest.raises(ValueError):

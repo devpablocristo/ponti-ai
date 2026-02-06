@@ -15,10 +15,10 @@ app/main/bin/
 # Local Configuration Files
 # Local config can include sensitive or environment-specific settings and should not be in version control.
 # Uncomment the following line if you decide to exclude environment configs
-.env
-.env.*
-.env.local
-.env.*.local
+# .env
+# .env.*
+# .env.local
+# .env.*.local
 
 # System-generated Files
 # These files are created by the operating system or the user's environment and can interfere with others.
@@ -133,7 +133,11 @@ Desktop.ini
 # Debugging binaries
 __debug_bin*
 
-.cursorignore
-.cursorrules
 *.code-workspace
 *.dump
+
+# ML Models (trained models are large binary files)
+ml_models/**/*.joblib
+ml_models/**/*.pkl
+ml_models/**/active.txt
+!ml_models/.gitkeep
