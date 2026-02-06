@@ -1,4 +1,4 @@
-# Ponti-AI / AI Copilot v2 - Arquitectura Actualizada
+# Ponti-AI / AI Copilot v2 - Arquitectura
 
 ## 1) Que es este servicio
 Ponti-AI es una API en FastAPI que:
