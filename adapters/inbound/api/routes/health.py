@@ -20,5 +20,5 @@ def readyz(container: AppContainer = Depends(get_container)) -> dict[str, str]:
 
 
 @router.get("/metrics")
-def metrics() -> dict[str, dict[str, float]]:
+def metrics() -> dict[str, object]:
     return snapshot()

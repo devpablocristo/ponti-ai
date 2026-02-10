@@ -11,6 +11,8 @@ from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
 from application.insights.use_cases.recompute_active import RecomputeActive
 from application.insights.use_cases.recompute_baselines import RecomputeBaselines
+from application.insights.use_cases.queue_recompute_event import QueueRecomputeEvent
+from application.insights.use_cases.process_recompute_queue import ProcessRecomputeQueue
 from application.insights.ports.job_lock import JobLockPort
 from app.config import Settings
 
@@ -31,6 +33,8 @@ class AppContainer:
     record_action: RecordAction
     recompute_active: RecomputeActive
     recompute_baselines: RecomputeBaselines
+    queue_recompute_event: QueueRecomputeEvent
+    process_recompute_queue: ProcessRecomputeQueue
     job_lock: JobLockPort
     # ML Facade (opcional, None si ML no esta habilitado)
     ml_facade: "MLFacade | None" = None

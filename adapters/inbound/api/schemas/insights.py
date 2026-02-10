@@ -62,6 +62,31 @@ class JobRecomputeRequest(BaseModel):
     batch_size: int | None = None
 
 
+class RecomputeEventRequest(BaseModel):
+    source: str = Field(..., min_length=1)
+    reason: str | None = None
+    debounce_seconds: int | None = Field(default=None, ge=0, le=86400)
+
+
+class RecomputeEventResponse(BaseModel):
+    status: str
+    project_id: str
+
+
+class JobProcessQueueRequest(BaseModel):
+    limit: int | None = Field(default=None, ge=1, le=1000)
+    workers: int | None = Field(default=None, ge=1, le=64)
+
+
+class JobProcessQueueResponse(BaseModel):
+    status: str
+    claimed: int
+    processed: int
+    ok: int
+    locked: int
+    errors: int
+
+
 class JobRecomputeBaselinesRequest(BaseModel):
     batch_size: int | None = None
 

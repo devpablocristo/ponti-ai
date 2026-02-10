@@ -8,6 +8,10 @@ from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.insights import (
     JobRetrainMLRequest,
     JobRetrainMLResponse,
+    JobProcessQueueRequest,
+    JobProcessQueueResponse,
+    RecomputeEventRequest,
+    RecomputeEventResponse,
     JobRecomputeBaselinesRequest,
     JobRecomputeBaselinesResponse,
     JobRecomputeRequest,
@@ -16,6 +20,51 @@ from adapters.outbound.observability.logging import log_event
 from adapters.outbound.observability.metrics import inc_counter, observe_ms
 
 router = APIRouter()
+
+
+@router.post("/v1/jobs/recompute-queue/enqueue", response_model=RecomputeEventResponse)
+def enqueue_recompute_event(
+    req: RecomputeEventRequest,
+    auth: AuthContext = Depends(require_headers),
+    container: AppContainer = Depends(get_container),
+) -> RecomputeEventResponse:
+    debounce_seconds = (
+        req.debounce_seconds
+        if req.debounce_seconds is not None
+        else container.settings.insights_recompute_debounce_seconds
+    )
+    result = container.queue_recompute_event.handle(
+        project_id=auth.project_id,
+        source=req.source,
+        reason=req.reason,
+        debounce_seconds=debounce_seconds,
+    )
+    return RecomputeEventResponse(status=str(result["status"]), project_id=str(result["project_id"]))
+
+
+@router.post("/v1/jobs/recompute-queue/process", response_model=JobProcessQueueResponse)
+def process_recompute_queue(
+    req: JobProcessQueueRequest | None = None,
+    auth: AuthContext = Depends(require_headers),
+    container: AppContainer = Depends(get_container),
+) -> JobProcessQueueResponse:
+    _ = auth
+    limit = req.limit if req and req.limit else container.settings.insights_recompute_queue_batch_size
+    workers = req.workers if req and req.workers else container.settings.insights_recompute_queue_workers
+    result = container.process_recompute_queue.handle(
+        limit=limit,
+        workers=workers,
+        lock_key_base=container.settings.insights_recompute_lock_key,
+        stale_lock_seconds=container.settings.insights_recompute_stale_lock_seconds,
+    )
+    return JobProcessQueueResponse(
+        status="ok",
+        claimed=int(result.get("claimed", 0)),
+        processed=int(result.get("processed", 0)),
+        ok=int(result.get("ok", 0)),
+        locked=int(result.get("locked", 0)),
+        errors=int(result.get("errors", 0)),
+    )
 
 
 @router.post("/v1/jobs/recompute-active")

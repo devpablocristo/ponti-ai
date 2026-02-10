@@ -42,7 +42,7 @@ services:
     environment:
       - APP_NAME=ai-copilot-service
       - APP_ENV=local
-      - DB_DSN=postgresql://admin:admin@host.docker.internal:5432/new_ponti_db_dev?sslmode=disable
+      - DB_DSN=postgresql://postgres:postgres@ai-db:5432/ai_copilot?sslmode=disable
       - AI_SERVICE_KEYS=servicekey123
       - STATEMENT_TIMEOUT_MS=20000
       - MAX_LIMIT=200
@@ -52,6 +52,7 @@ services:
       - LLM_PROVIDER=ollama
       - LLM_BASE_URL=http://ollama:11434
       - LLM_MODEL=llama3.1
+      - LLM_TIMEOUT_S=120
       - EMBEDDING_PROVIDER=ollama
       - EMBEDDING_MODEL=nomic-embed-text
       - INSIGHTS_RATIO_HIGH=0.5
@@ -67,6 +68,10 @@ services:
       - INSIGHTS_BASELINE_LOCK_KEY=41001
       - INSIGHTS_RECOMPUTE_LOCK_KEY=41002
       - INSIGHTS_BASELINE_BATCH_SIZE=200
+      - INSIGHTS_RECOMPUTE_DEBOUNCE_SECONDS=120
+      - INSIGHTS_RECOMPUTE_QUEUE_BATCH_SIZE=50
+      - INSIGHTS_RECOMPUTE_QUEUE_WORKERS=4
+      - INSIGHTS_RECOMPUTE_STALE_LOCK_SECONDS=300
       - ML_ENABLED=true
       - ML_MODEL_TYPE=isolation_forest
       - ML_MODELS_DIR=/app/ml_models

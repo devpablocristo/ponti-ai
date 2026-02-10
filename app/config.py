@@ -46,6 +46,10 @@ class Settings:
     insights_baseline_lock_key: int
     insights_recompute_lock_key: int
     insights_baseline_batch_size: int
+    insights_recompute_debounce_seconds: int
+    insights_recompute_queue_batch_size: int
+    insights_recompute_queue_workers: int
+    insights_recompute_stale_lock_seconds: int
 
     # Planner v2 (LLM)
     domain: str
@@ -168,6 +172,10 @@ def load_settings() -> Settings:
         insights_baseline_lock_key=_get_required_int("INSIGHTS_BASELINE_LOCK_KEY"),
         insights_recompute_lock_key=_get_required_int("INSIGHTS_RECOMPUTE_LOCK_KEY"),
         insights_baseline_batch_size=_get_required_int("INSIGHTS_BASELINE_BATCH_SIZE"),
+        insights_recompute_debounce_seconds=max(0, _get_optional_int("INSIGHTS_RECOMPUTE_DEBOUNCE_SECONDS", 120)),
+        insights_recompute_queue_batch_size=max(1, _get_optional_int("INSIGHTS_RECOMPUTE_QUEUE_BATCH_SIZE", 50)),
+        insights_recompute_queue_workers=max(1, _get_optional_int("INSIGHTS_RECOMPUTE_QUEUE_WORKERS", 4)),
+        insights_recompute_stale_lock_seconds=max(30, _get_optional_int("INSIGHTS_RECOMPUTE_STALE_LOCK_SECONDS", 300)),
         domain=_get_optional("DOMAIN", "agriculture") or "agriculture",
         max_actions_allowed=_get_optional_int("MAX_ACTIONS_ALLOWED", 4),
         ml_enabled=_get_optional("ML_ENABLED", "false") == "true",

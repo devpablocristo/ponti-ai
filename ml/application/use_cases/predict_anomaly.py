@@ -36,6 +36,7 @@ from typing import Any
 
 from ml.application.ports.feature_engineer import FeatureEngineerPort
 from ml.application.ports.model_store import ModelStorePort
+from ml.adapters.training.sklearn_feature_engineer import SklearnFeatureEngineer
 from ml.config import MLConfig
 from ml.domain.entities import Dataset, Prediction, ModelInfo
 
@@ -116,11 +117,25 @@ class PredictAnomalyUseCase:
         )
 
         self._model = model
-        self._pipeline = pipeline
+        self._pipeline = self._normalize_pipeline(pipeline)
         self._model_version = active_version
         self._model_info = model_info
 
         return True
+
+    def _normalize_pipeline(self, pipeline: Any | None) -> FeatureEngineerPort | None:
+        if pipeline is None:
+            return None
+        if hasattr(pipeline, "transform"):
+            return pipeline
+        if isinstance(pipeline, dict):
+            engineer = SklearnFeatureEngineer(self.config)
+            engineer._imputer = pipeline["imputer"]  # type: ignore[attr-defined]
+            engineer._scaler = pipeline["scaler"]  # type: ignore[attr-defined]
+            engineer._feature_names = list(pipeline["feature_names"])  # type: ignore[attr-defined]
+            engineer._is_fitted = bool(pipeline.get("is_fitted", True))  # type: ignore[attr-defined]
+            return engineer
+        raise ValueError(f"Pipeline no soportado: {type(pipeline)!r}")
 
     def execute(self, dataset: Dataset) -> PredictResult | None:
         """
@@ -151,6 +166,8 @@ class PredictAnomalyUseCase:
             return None
 
         # Transformar features con el pipeline guardado
+        if self._pipeline is None:
+            raise ValueError("Pipeline no disponible para inferencia.")
         transformed = self._pipeline.transform(dataset)
 
         # Predecir con el modelo

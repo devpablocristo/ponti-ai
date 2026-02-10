@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS ai_baselines (
     scope_id TEXT NULL,
     cohort_key TEXT NOT NULL,
     feature_name TEXT NOT NULL,
-    window TEXT NOT NULL,
+    window_name TEXT NOT NULL,
     p50 DOUBLE PRECISION NOT NULL,
     p75 DOUBLE PRECISION NOT NULL,
     p90 DOUBLE PRECISION NOT NULL,
@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS ai_baselines (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_baselines_scope_feature_window
-    ON ai_baselines (scope_type, scope_id, cohort_key, feature_name, window);
+    ON ai_baselines (scope_type, scope_id, cohort_key, feature_name, window_name);
 
 COMMIT;

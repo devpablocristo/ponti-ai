@@ -16,6 +16,7 @@ from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
 from adapters.outbound.db.repos.proposal_store_pg import ProposalStorePG
 from adapters.outbound.db.repos.rag_repo_pg import RagRepositoryPG
+from adapters.outbound.db.repos.recompute_queue_pg import RecomputeQueuePG
 from adapters.outbound.llm.client import build_llm_client
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
 from adapters.outbound.llm.insight_planner import InsightPlannerLLM
@@ -31,6 +32,8 @@ from application.insights.use_cases.get_summary import GetSummary
 from application.insights.use_cases.record_action import RecordAction
 from application.insights.use_cases.recompute_active import RecomputeActive
 from application.insights.use_cases.recompute_baselines import RecomputeBaselines
+from application.insights.use_cases.process_recompute_queue import ProcessRecomputeQueue
+from application.insights.use_cases.queue_recompute_event import QueueRecomputeEvent
 
 
 def _create_ml_facade(settings):
@@ -65,6 +68,7 @@ def create_app() -> FastAPI:
     insight_repo = InsightRepositoryPG(settings)
     insight_history = InsightHistoryPG(settings)
     proposal_store = ProposalStorePG(settings)
+    recompute_queue_repo = RecomputeQueuePG(settings)
 
     baseline_repo = BaselineRepositoryPG(settings)
     baseline_computer = BaselineComputerPG(settings)
@@ -113,6 +117,13 @@ def create_app() -> FastAPI:
 
     recompute_active = RecomputeActive(compute_insights, insight_repo, job_lock)
     recompute_baselines = RecomputeBaselines(baseline_computer, baseline_repo, project_repo, job_lock)
+    queue_recompute_event = QueueRecomputeEvent(recompute_queue_repo)
+    process_recompute_queue = ProcessRecomputeQueue(
+        queue_repo=recompute_queue_repo,
+        compute_insights=compute_insights,
+        insight_repo=insight_repo,
+        job_lock=job_lock,
+    )
 
     container = AppContainer(
         settings=settings,
@@ -124,6 +135,8 @@ def create_app() -> FastAPI:
         record_action=record_action,
         recompute_active=recompute_active,
         recompute_baselines=recompute_baselines,
+        queue_recompute_event=queue_recompute_event,
+        process_recompute_queue=process_recompute_queue,
         job_lock=job_lock,
         ml_facade=ml_facade,
     )
