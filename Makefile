@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UVICORN_PORT ?= 8090
 COMPOSE ?= docker compose
 
-.PHONY: install up up-ai down build migrate run test train-ml pull-ollama-models smoke smoke-local eval-ml eval-ml-local
+.PHONY: install up up-ai down build migrate run test train-ml pull-ollama-models smoke smoke-local eval-ml eval-ml-local benchmark-k6
 
 install:
 	python -m pip install -r requirements.txt
@@ -50,3 +50,7 @@ eval-ml:
 
 eval-ml-local:
 	python scripts/eval_ml_mvp.py $(EVAL_ML_ARGS)
+
+benchmark-k6:
+	chmod +x scripts/benchmark_k6.sh
+	scripts/benchmark_k6.sh
