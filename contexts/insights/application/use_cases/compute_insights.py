@@ -58,6 +58,7 @@ class ComputeInsights:
         user_id: str,
         computed_by: str = "on_demand",
         job_run_id: str | None = None,
+        max_features: int | None = None,
     ) -> ComputeInsightsResult:
         request_id = str(uuid.uuid4())
         started = time.time()
@@ -70,6 +71,8 @@ class ComputeInsights:
 
         try:
             features = self.feature_repo.fetch_features(project_id)
+            if max_features is not None:
+                features = features[: max(0, int(max_features))]
             computed = len(features)
             insights = self.model_runner.compute(project_id, features)
             if self.ml_detector is not None:
@@ -132,6 +135,7 @@ class ComputeInsights:
                     "project_id": project_id,
                     "rules_insights_created": rules_created,
                     "ml_insights_created": ml_created,
+                    "max_features": max_features,
                 },
                 duration_ms=duration_ms,
                 rows_count=created,

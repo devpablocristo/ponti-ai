@@ -267,6 +267,16 @@ class FakeMLDetector(MLDetectorPort):
             )
         ]
 
+
+class CapturingModelRunner(ModelRunnerPort):
+    def __init__(self) -> None:
+        self.last_features_count = 0
+
+    def compute(self, project_id: str, features: list[FeatureValue]) -> list[Insight]:
+        _ = project_id
+        self.last_features_count = len(features)
+        return []
+
 def test_compute_insights_creates_records() -> None:
     use_case = ComputeInsights(
         FakeFeatureRepo(),
@@ -283,6 +293,34 @@ def test_compute_insights_creates_records() -> None:
     )
     result = use_case.handle(project_id="p1", user_id="u1")
     assert result.insights_created == 1
+
+
+def test_compute_insights_honors_max_features() -> None:
+    class ManyFeaturesRepo(FeatureRepositoryPort):
+        def fetch_features(self, project_id: str) -> list[FeatureValue]:
+            return [
+                FeatureValue(project_id=project_id, entity_type="project", entity_id=project_id, feature_name="f1", window="all", value=1.0),
+                FeatureValue(project_id=project_id, entity_type="project", entity_id=project_id, feature_name="f2", window="all", value=2.0),
+                FeatureValue(project_id=project_id, entity_type="project", entity_id=project_id, feature_name="f3", window="all", value=3.0),
+            ]
+
+    model_runner = CapturingModelRunner()
+    use_case = ComputeInsights(
+        ManyFeaturesRepo(),
+        model_runner,
+        FakeInsightRepo(),
+        FakeAuditLogger(),
+        FakeProposalStore(),
+        FakePlanner(),
+        FakeHistory(),
+        domain="agriculture",
+        max_actions_allowed=4,
+        llm_provider="stub",
+        llm_model="stub",
+    )
+    result = use_case.handle(project_id="p1", user_id="u1", max_features=2)
+    assert result.computed == 2
+    assert model_runner.last_features_count == 2
 
 
 def test_compute_insights_includes_ml_records() -> None:

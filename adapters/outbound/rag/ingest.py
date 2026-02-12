@@ -6,13 +6,14 @@ from pgvector.psycopg import register_vector
 
 from adapters.outbound.db.session import DBSession
 from adapters.outbound.rag.chunking import chunk_text
-from adapters.outbound.rag.embeddings import embed_texts
+from adapters.outbound.rag.embeddings import embed_texts, resolve_embedding_provider_model
 from app.config import Settings
 
 
 def ingest_documents(settings: Settings, project_id: str, documents: list[Any]) -> int:
     session = DBSession(settings)
     total_chunks = 0
+    provider, embedding_model = resolve_embedding_provider_model(settings)
 
     with session.connect() as conn:
         register_vector(conn)
@@ -62,7 +63,7 @@ def ingest_documents(settings: Settings, project_id: str, documents: list[Any]) 
                             "chunk_id": chunk_id,
                             "project_id": project_id,
                             "embedding": embedding,
-                            "model": settings.llm_provider,
+                            "model": f"{provider}:{embedding_model}",
                         },
                     )
                     total_chunks += 1

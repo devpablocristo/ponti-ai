@@ -76,10 +76,11 @@ def recompute_active(
     container: AppContainer = Depends(get_container),
 ) -> JobRecomputeResponse:
     started = time.time()
+    batch_size = req.batch_size if req else None
     result = container.recompute_active.handle(
         project_id=auth.project_id,
         lock_key=container.settings.insights_recompute_lock_key,
-        batch_size=req.batch_size if req else None,
+        batch_size=batch_size,
     )
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("jobs.recompute.duration_ms", duration_ms)
@@ -90,6 +91,7 @@ def recompute_active(
             "project_id": auth.project_id,
             "status": result.status,
             "job_run_id": result.job_run_id,
+            "batch_size": batch_size,
         },
     )
     return JobRecomputeResponse(status=result.status, job_run_id=result.job_run_id)

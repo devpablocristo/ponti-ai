@@ -18,7 +18,9 @@ class RecomputeActive:
         self.job_lock = job_lock
 
     def handle(self, project_id: str, lock_key: int, batch_size: int | None = None) -> RecomputeActiveResult:
-        _ = batch_size
+        effective_batch_size: int | None = None
+        if batch_size is not None:
+            effective_batch_size = max(1, int(batch_size))
         if not self.job_lock.try_lock(lock_key):
             return RecomputeActiveResult(status="locked", job_run_id="")
         job_run_id = str(uuid.uuid4())
@@ -28,6 +30,7 @@ class RecomputeActive:
                 user_id="scheduler",
                 computed_by="scheduler",
                 job_run_id=job_run_id,
+                max_features=effective_batch_size,
             )
             self.insight_repo.mark_recomputed(project_id)
         finally:

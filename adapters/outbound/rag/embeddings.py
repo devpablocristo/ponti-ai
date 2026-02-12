@@ -10,8 +10,7 @@ def embed_texts(settings: Settings, texts: list[str], dim: int) -> list[list[flo
     if not texts:
         return []
 
-    provider = (os.getenv("EMBEDDING_PROVIDER") or settings.llm_provider or "stub").strip().lower()
-    model = (os.getenv("EMBEDDING_MODEL") or _default_embedding_model(provider)).strip()
+    provider, model = resolve_embedding_provider_model(settings)
 
     if provider == "stub":
         return _deterministic_embeddings(texts, dim)
@@ -23,6 +22,12 @@ def embed_texts(settings: Settings, texts: list[str], dim: int) -> list[list[flo
         return _resize_embeddings(_embed_ollama(settings, model, texts), dim)
 
     raise RuntimeError(f"EMBEDDING_PROVIDER no soportado: {provider}")
+
+
+def resolve_embedding_provider_model(settings: Settings) -> tuple[str, str]:
+    provider = (os.getenv("EMBEDDING_PROVIDER") or settings.llm_provider or "stub").strip().lower()
+    model = (os.getenv("EMBEDDING_MODEL") or _default_embedding_model(provider)).strip()
+    return provider, model
 
 
 def _embed_openai(settings: Settings, model: str, texts: list[str]) -> list[list[float]]:

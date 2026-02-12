@@ -59,7 +59,7 @@ class ActionResponse(BaseModel):
 
 
 class JobRecomputeRequest(BaseModel):
-    batch_size: int | None = None
+    batch_size: int | None = Field(default=None, ge=1, le=10000)
 
 
 class JobRecomputeResponse(BaseModel):
