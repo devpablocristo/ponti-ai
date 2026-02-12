@@ -15,11 +15,13 @@ from adapters.inbound.api.schemas.insights import (
     JobRecomputeBaselinesRequest,
     JobRecomputeBaselinesResponse,
     JobRecomputeRequest,
+    JobRecomputeResponse,
 )
 from adapters.outbound.observability.logging import log_event
 from adapters.outbound.observability.metrics import inc_counter, observe_ms
 
 router = APIRouter()
+HANDLED_JOB_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
 
 
 @router.post("/v1/jobs/recompute-queue/enqueue", response_model=RecomputeEventResponse)
@@ -39,7 +41,7 @@ def enqueue_recompute_event(
         reason=req.reason,
         debounce_seconds=debounce_seconds,
     )
-    return RecomputeEventResponse(status=str(result["status"]), project_id=str(result["project_id"]))
+    return RecomputeEventResponse(status=result.status, project_id=result.project_id)
 
 
 @router.post("/v1/jobs/recompute-queue/process", response_model=JobProcessQueueResponse)
@@ -59,20 +61,20 @@ def process_recompute_queue(
     )
     return JobProcessQueueResponse(
         status="ok",
-        claimed=int(result.get("claimed", 0)),
-        processed=int(result.get("processed", 0)),
-        ok=int(result.get("ok", 0)),
-        locked=int(result.get("locked", 0)),
-        errors=int(result.get("errors", 0)),
+        claimed=int(result.claimed),
+        processed=int(result.processed),
+        ok=int(result.ok),
+        locked=int(result.locked),
+        errors=int(result.errors),
     )
 
 
-@router.post("/v1/jobs/recompute-active")
+@router.post("/v1/jobs/recompute-active", response_model=JobRecomputeResponse)
 def recompute_active(
     req: JobRecomputeRequest | None = None,
     auth: AuthContext = Depends(require_headers),
     container: AppContainer = Depends(get_container),
-) -> dict[str, str]:
+) -> JobRecomputeResponse:
     started = time.time()
     result = container.recompute_active.handle(
         project_id=auth.project_id,
@@ -86,11 +88,11 @@ def recompute_active(
         "jobs.recompute",
         {
             "project_id": auth.project_id,
-            "status": result["status"],
-            "job_run_id": result["job_run_id"],
+            "status": result.status,
+            "job_run_id": result.job_run_id,
         },
     )
-    return {"status": result["status"], "job_run_id": result["job_run_id"]}
+    return JobRecomputeResponse(status=result.status, job_run_id=result.job_run_id)
 
 
 @router.post("/v1/jobs/recompute-baselines", response_model=JobRecomputeBaselinesResponse)
@@ -115,15 +117,15 @@ def recompute_baselines(
         "jobs.baselines",
         {
             "project_id": auth.project_id,
-            "status": result["status"],
-            "job_run_id": result["job_run_id"],
+            "status": result.status,
+            "job_run_id": result.job_run_id,
         },
     )
     return JobRecomputeBaselinesResponse(
-        status=str(result["status"]),
-        job_run_id=str(result["job_run_id"]),
-        cohort_saved=int(result.get("cohort_saved", 0)),
-        project_saved=int(result.get("project_saved", 0)),
+        status=result.status,
+        job_run_id=result.job_run_id,
+        cohort_saved=int(result.cohort_saved),
+        project_saved=int(result.project_saved),
     )
 
 
@@ -189,7 +191,7 @@ def retrain_ml(
             metrics={k: float(v) for k, v in dict(result.get("metrics", {})).items()},
             error=None,
         )
-    except Exception as exc:  # noqa: BLE001
+    except HANDLED_JOB_ERRORS as exc:
         duration_ms = int((time.time() - started) * 1000)
         observe_ms("jobs.retrain_ml.duration_ms", duration_ms)
         inc_counter("jobs.retrain_ml.count", 1)
@@ -284,7 +286,7 @@ def retrain_ml_if_needed(
             metrics={k: float(v) for k, v in dict(result.get("metrics", {})).items()},
             error=None,
         )
-    except Exception as exc:  # noqa: BLE001
+    except HANDLED_JOB_ERRORS as exc:
         duration_ms = int((time.time() - started) * 1000)
         observe_ms("jobs.retrain_ml_if_needed.duration_ms", duration_ms)
         inc_counter("jobs.retrain_ml_if_needed.count", 1)

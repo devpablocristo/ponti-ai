@@ -1,5 +1,6 @@
 import uuid
 
+from application.insights.dto import RecomputeActiveResult
 from application.insights.use_cases.compute_insights import ComputeInsights
 from application.insights.ports.insight_repository import InsightRepositoryPort
 from application.insights.ports.job_lock import JobLockPort
@@ -16,10 +17,10 @@ class RecomputeActive:
         self.insight_repo = insight_repo
         self.job_lock = job_lock
 
-    def handle(self, project_id: str, lock_key: int, batch_size: int | None = None) -> dict[str, str]:
+    def handle(self, project_id: str, lock_key: int, batch_size: int | None = None) -> RecomputeActiveResult:
         _ = batch_size
         if not self.job_lock.try_lock(lock_key):
-            return {"status": "locked", "job_run_id": ""}
+            return RecomputeActiveResult(status="locked", job_run_id="")
         job_run_id = str(uuid.uuid4())
         try:
             self.compute_insights.handle(
@@ -31,4 +32,4 @@ class RecomputeActive:
             self.insight_repo.mark_recomputed(project_id)
         finally:
             self.job_lock.release(lock_key)
-        return {"status": "ok", "job_run_id": job_run_id}
+        return RecomputeActiveResult(status="ok", job_run_id=job_run_id)

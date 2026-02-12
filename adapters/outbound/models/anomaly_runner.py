@@ -41,141 +41,200 @@ class AnomalyRunner:
 
     def compute(self, project_id: str, features: list[FeatureValue]) -> list[Insight]:
         now = datetime.now(timezone.utc)
-        insights: list[Insight] = []
         cooldown_until = now + timedelta(days=self.cooldown_days)
+        cohort_key = self._resolve_cohort_key(features)
+        feature_map = self._project_feature_map(features)
+        insights: list[Insight] = []
 
+        for feature in self._project_features(features):
+            baseline, baseline_scope = self._resolve_baseline(project_id, cohort_key, feature.feature_name, feature.window)
+            if baseline is None:
+                continue
+            classification = self._classify_feature(feature.value, baseline.p75, baseline.p90)
+            if classification is None:
+                continue
+            insight_type, severity, delta_ratio = classification
+            insights.append(
+                self._build_baseline_insight(
+                    project_id=project_id,
+                    feature=feature,
+                    baseline=baseline,
+                    baseline_scope=baseline_scope,
+                    cohort_key=cohort_key,
+                    insight_type=insight_type,
+                    severity=severity,
+                    delta_ratio=delta_ratio,
+                    now=now,
+                    cooldown_until=cooldown_until,
+                )
+            )
+
+        insights.extend(self._build_spike_insights(project_id, feature_map, now, cooldown_until))
+        return insights
+
+    @staticmethod
+    def _project_features(features: list[FeatureValue]) -> list[FeatureValue]:
+        return [feature for feature in features if feature.entity_type == "project"]
+
+    def _resolve_cohort_key(self, features: list[FeatureValue]) -> str:
         total_hectares = None
-        for f in features:
-            if f.entity_type == "project" and f.feature_name == "total_hectares" and f.window == "all":
-                total_hectares = f.value
+        for feature in self._project_features(features):
+            if feature.feature_name == "total_hectares" and feature.window == "all":
+                total_hectares = feature.value
                 break
+        if total_hectares is None:
+            return "size=unknown"
+        if total_hectares <= self.size_small_max:
+            return "size=small"
+        if total_hectares <= self.size_medium_max:
+            return "size=medium"
+        return "size=large"
 
-        cohort_key = "size=unknown"
-        if total_hectares is not None:
-            if total_hectares <= self.size_small_max:
-                cohort_key = "size=small"
-            elif total_hectares <= self.size_medium_max:
-                cohort_key = "size=medium"
-            else:
-                cohort_key = "size=large"
-
-        feature_map: dict[tuple[str, str], FeatureValue] = {
-            (f.feature_name, f.window): f for f in features if f.entity_type == "project"
+    def _project_feature_map(self, features: list[FeatureValue]) -> dict[tuple[str, str], FeatureValue]:
+        return {
+            (feature.feature_name, feature.window): feature
+            for feature in self._project_features(features)
         }
 
-        for feature in features:
-            if feature.entity_type != "project":
-                continue
+    def _resolve_baseline(
+        self,
+        project_id: str,
+        cohort_key: str,
+        feature_name: str,
+        window: str,
+    ):
+        baseline = self.baseline_repo.get_baseline(
+            scope_type="project",
+            scope_id=project_id,
+            cohort_key="self",
+            feature_name=feature_name,
+            window=window,
+        )
+        if baseline is not None:
+            return baseline, "project"
 
-            baseline = self.baseline_repo.get_baseline(
-                scope_type="project",
-                scope_id=project_id,
-                cohort_key="self",
-                feature_name=feature.feature_name,
-                window=feature.window,
-            )
-            baseline_scope = "project"
-            if baseline is None:
-                baseline = self.baseline_repo.get_baseline(
-                    scope_type="global",
-                    scope_id=None,
-                    cohort_key=cohort_key,
-                    feature_name=feature.feature_name,
-                    window=feature.window,
-                )
-                baseline_scope = "cohort"
-            if baseline is None:
-                baseline = self.baseline_repo.get_baseline(
-                    scope_type="global",
-                    scope_id=None,
-                    cohort_key=cohort_key,
-                    feature_name=feature.feature_name,
-                    window="all",
-                )
-                baseline_scope = "cohort"
-            if baseline is None:
-                continue
+        baseline = self.baseline_repo.get_baseline(
+            scope_type="global",
+            scope_id=None,
+            cohort_key=cohort_key,
+            feature_name=feature_name,
+            window=window,
+        )
+        if baseline is not None:
+            return baseline, "cohort"
 
-            if feature.value >= baseline.p90:
-                insight_type = "anomaly"
-                severity = 80
-                delta_ratio = (feature.value - baseline.p90) / baseline.p90 if baseline.p90 else 0
-            elif feature.value >= baseline.p75:
-                insight_type = "recommendation"
-                severity = 40
-                delta_ratio = (feature.value - baseline.p75) / baseline.p75 if baseline.p75 else 0
-            else:
-                continue
+        baseline = self.baseline_repo.get_baseline(
+            scope_type="global",
+            scope_id=None,
+            cohort_key=cohort_key,
+            feature_name=feature_name,
+            window="all",
+        )
+        return baseline, "cohort"
 
-            title = f"{feature.feature_name} alto vs baseline"
-            summary = (
+    @staticmethod
+    def _classify_feature(value: float, p75: float, p90: float) -> tuple[str, int, float] | None:
+        if value >= p90:
+            delta_ratio = (value - p90) / p90 if p90 else 0
+            return "anomaly", 80, delta_ratio
+        if value >= p75:
+            delta_ratio = (value - p75) / p75 if p75 else 0
+            return "recommendation", 40, delta_ratio
+        return None
+
+    def _impact_bounds(self, delta_ratio: float) -> tuple[float, float]:
+        impact_pct = min(max(delta_ratio * self.impact_k, 0.0), self.impact_cap)
+        return impact_pct * 0.7, impact_pct * 1.3
+
+    @staticmethod
+    def _confidence(n_samples: int) -> str:
+        if n_samples >= 50:
+            return "high"
+        if n_samples >= 20:
+            return "medium"
+        return "low"
+
+    @staticmethod
+    def _action_for_feature(feature_name: str) -> tuple[str, str]:
+        if feature_name in ("inputs_total_used", "stock_variance"):
+            return "inventory_check", "Revisar stock"
+        if feature_name in ("cost_total", "cost_per_ha"):
+            return "review_inputs", "Revisar costos"
+        return "checklist", "Revisar"
+
+    def _build_baseline_insight(
+        self,
+        *,
+        project_id: str,
+        feature: FeatureValue,
+        baseline,
+        baseline_scope: str,
+        cohort_key: str,
+        insight_type: str,
+        severity: int,
+        delta_ratio: float,
+        now: datetime,
+        cooldown_until: datetime,
+    ) -> Insight:
+        impact_min, impact_max = self._impact_bounds(delta_ratio)
+        action_type, cta_label = self._action_for_feature(feature.feature_name)
+        dedupe_key = f"{feature.feature_name}:{feature.window}:{insight_type}"
+        stable_key = (
+            f"{project_id}|{feature.entity_type}|{feature.entity_id}|"
+            f"{feature.feature_name}|{feature.window}|{insight_type}"
+        )
+        return Insight(
+            id=str(uuid.uuid5(uuid.NAMESPACE_URL, stable_key)),
+            project_id=project_id,
+            entity_type=feature.entity_type,
+            entity_id=feature.entity_id,
+            type=insight_type,
+            severity=severity,
+            priority=severity,
+            title=f"{feature.feature_name} alto vs baseline",
+            summary=(
                 f"Valor {feature.value} vs p75 {baseline.p75} y p90 {baseline.p90} "
                 f"({baseline_scope}, {cohort_key})."
-            )
+            ),
+            evidence={
+                "feature": feature.feature_name,
+                "window": feature.window,
+                "value": feature.value,
+                "baseline_scope": baseline_scope,
+                "cohort_key": cohort_key,
+                "p75": baseline.p75,
+                "p90": baseline.p90,
+                "n_samples": baseline.n_samples,
+            },
+            explanations={"rule": "baseline_percentile"},
+            action={
+                "action_type": action_type,
+                "action_params": {"feature": feature.feature_name, "window": feature.window},
+                "suggested_due_date": (now + timedelta(days=7)).date().isoformat(),
+                "cta_label": cta_label,
+            },
+            model_version=self.model_version,
+            features_version=self.features_version,
+            computed_at=now,
+            valid_until=now + timedelta(days=7),
+            status="new",
+            impact_min=impact_min,
+            impact_max=impact_max,
+            impact_unit="%",
+            confidence=self._confidence(baseline.n_samples),
+            dedupe_key=dedupe_key,
+            cooldown_until=cooldown_until,
+            rules_version="v2",
+        )
 
-            impact_pct = min(max(delta_ratio * self.impact_k, 0.0), self.impact_cap)
-            impact_min = impact_pct * 0.7
-            impact_max = impact_pct * 1.3
-            confidence = "high" if baseline.n_samples >= 50 else "medium" if baseline.n_samples >= 20 else "low"
-
-            if feature.feature_name in ("inputs_total_used", "stock_variance"):
-                action_type = "inventory_check"
-                cta_label = "Revisar stock"
-            elif feature.feature_name in ("cost_total", "cost_per_ha"):
-                action_type = "review_inputs"
-                cta_label = "Revisar costos"
-            else:
-                action_type = "checklist"
-                cta_label = "Revisar"
-
-            dedupe_key = f"{feature.feature_name}:{feature.window}:{insight_type}"
-            stable_key = (
-                f"{project_id}|{feature.entity_type}|{feature.entity_id}|"
-                f"{feature.feature_name}|{feature.window}|{insight_type}"
-            )
-            insights.append(
-                Insight(
-                    id=str(uuid.uuid5(uuid.NAMESPACE_URL, stable_key)),
-                    project_id=project_id,
-                    entity_type=feature.entity_type,
-                    entity_id=feature.entity_id,
-                    type=insight_type,
-                    severity=severity,
-                    priority=severity,
-                    title=title,
-                    summary=summary,
-                    evidence={
-                        "feature": feature.feature_name,
-                        "window": feature.window,
-                        "value": feature.value,
-                        "baseline_scope": baseline_scope,
-                        "cohort_key": cohort_key,
-                        "p75": baseline.p75,
-                        "p90": baseline.p90,
-                        "n_samples": baseline.n_samples,
-                    },
-                    explanations={"rule": "baseline_percentile"},
-                    action={
-                        "action_type": action_type,
-                        "action_params": {"feature": feature.feature_name, "window": feature.window},
-                        "suggested_due_date": (now + timedelta(days=7)).date().isoformat(),
-                        "cta_label": cta_label,
-                    },
-                    model_version=self.model_version,
-                    features_version=self.features_version,
-                    computed_at=now,
-                    valid_until=now + timedelta(days=7),
-                    status="new",
-                    impact_min=impact_min,
-                    impact_max=impact_max,
-                    impact_unit="%",
-                    confidence=confidence,
-                    dedupe_key=dedupe_key,
-                    cooldown_until=cooldown_until,
-                    rules_version="v2",
-                )
-            )
-
+    def _build_spike_insights(
+        self,
+        project_id: str,
+        feature_map: dict[tuple[str, str], FeatureValue],
+        now: datetime,
+        cooldown_until: datetime,
+    ) -> list[Insight]:
+        insights: list[Insight] = []
         for base_name in ["cost_total", "inputs_total_used", "workorders_count"]:
             last_7 = feature_map.get((base_name, "last_7d"))
             last_30 = feature_map.get((base_name, "last_30d"))
@@ -187,13 +246,8 @@ class AnomalyRunner:
             ratio = last_7.value / expected_week
             if ratio < self.spike_ratio:
                 continue
-            insight_type = "spike"
-            severity = 90
-            title = f"Spike reciente en {base_name}"
-            summary = f"Ultimos 7d vs 30d: ratio {ratio:.2f}."
-            impact_pct = min(max((ratio - 1.0) * self.impact_k, 0.0), self.impact_cap)
-            impact_min = impact_pct * 0.7
-            impact_max = impact_pct * 1.3
+
+            impact_min, impact_max = self._impact_bounds(ratio - 1.0)
             dedupe_key = f"{base_name}:spike"
             stable_key = f"{project_id}|project|{project_id}|{base_name}|spike"
             insights.append(
@@ -202,11 +256,11 @@ class AnomalyRunner:
                     project_id=project_id,
                     entity_type="project",
                     entity_id=project_id,
-                    type=insight_type,
-                    severity=severity,
-                    priority=severity,
-                    title=title,
-                    summary=summary,
+                    type="spike",
+                    severity=90,
+                    priority=90,
+                    title=f"Spike reciente en {base_name}",
+                    summary=f"Ultimos 7d vs 30d: ratio {ratio:.2f}.",
                     evidence={
                         "feature": base_name,
                         "last_7d": last_7.value,
@@ -234,5 +288,4 @@ class AnomalyRunner:
                     rules_version="v2",
                 )
             )
-
         return insights

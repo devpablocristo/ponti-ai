@@ -110,6 +110,38 @@ def list_tools_as_json() -> list[dict[str, Any]]:
     return [{"name": t.name, "description": t.description, "args_schema": t.args_schema} for t in _TOOLS]
 
 
+def _validate_required_keys(tool_args: dict[str, Any], required: list[Any]) -> tuple[bool, str | None]:
+    for key in required:
+        if key not in tool_args:
+            return False, f"tool_args missing required: {key}"
+    return True, None
+
+
+def _validate_arg_type(key: str, expected: str | None, value: Any) -> tuple[bool, str | None]:
+    validators: dict[str, type | tuple[type, ...]] = {
+        "string": str,
+        "number": (int, float),
+        "integer": int,
+        "object": dict,
+        "array": list,
+    }
+    if expected is None or expected not in validators:
+        return True, None
+    if isinstance(value, validators[expected]):
+        return True, None
+    return False, f"tool_args.{key} debe ser {expected}"
+
+
+def _validate_property_types(tool_args: dict[str, Any], props: dict[str, Any]) -> tuple[bool, str | None]:
+    for key, spec in props.items():
+        if key not in tool_args:
+            continue
+        ok, error = _validate_arg_type(key, spec.get("type"), tool_args[key])
+        if not ok:
+            return ok, error
+    return True, None
+
+
 def validate_tool_args(tool_name: str, tool_args: Any) -> tuple[bool, str | None]:
     """
     Valida tool_args contra un subset práctico de JSON Schema (type/required/properties).
@@ -126,26 +158,9 @@ def validate_tool_args(tool_name: str, tool_args: Any) -> tuple[bool, str | None
         return False, "tool_args debe ser object"
 
     required = schema.get("required", [])
-    for key in required:
-        if key not in tool_args:
-            return False, f"tool_args missing required: {key}"
+    ok, error = _validate_required_keys(tool_args, required)
+    if not ok:
+        return ok, error
 
     props: dict[str, Any] = schema.get("properties", {}) or {}
-    for key, spec in props.items():
-        if key not in tool_args:
-            continue
-        expected = spec.get("type")
-        value = tool_args[key]
-        if expected == "string" and not isinstance(value, str):
-            return False, f"tool_args.{key} debe ser string"
-        if expected == "number" and not isinstance(value, (int, float)):
-            return False, f"tool_args.{key} debe ser number"
-        if expected == "integer" and not isinstance(value, int):
-            return False, f"tool_args.{key} debe ser integer"
-        if expected == "object" and not isinstance(value, dict):
-            return False, f"tool_args.{key} debe ser object"
-        if expected == "array" and not isinstance(value, list):
-            return False, f"tool_args.{key} debe ser array"
-
-    return True, None
-
+    return _validate_property_types(tool_args, props)

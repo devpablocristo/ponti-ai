@@ -62,6 +62,11 @@ class JobRecomputeRequest(BaseModel):
     batch_size: int | None = None
 
 
+class JobRecomputeResponse(BaseModel):
+    status: str
+    job_run_id: str
+
+
 class RecomputeEventRequest(BaseModel):
     source: str = Field(..., min_length=1)
     reason: str | None = None
@@ -149,3 +154,12 @@ class MLVersionChangeResponse(BaseModel):
     active_version: str | None = None
     rollback_target_version: str | None = None
     error: str | None = None
+
+
+class HealthStatusResponse(BaseModel):
+    status: str
+
+
+class MetricsSnapshotResponse(BaseModel):
+    counters: dict[str, float] = Field(default_factory=dict)
+    timers: dict[str, dict[str, float]] = Field(default_factory=dict)

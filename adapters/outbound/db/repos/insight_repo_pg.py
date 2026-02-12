@@ -1,6 +1,5 @@
 import json
 import uuid
-from datetime import datetime
 
 from adapters.outbound.db.session import DBSession
 from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
@@ -37,6 +36,13 @@ def _row_to_insight(row: dict) -> Insight:
         job_run_id=row.get("job_run_id"),
         rules_version=row.get("rules_version", "v1"),
     )
+
+
+def _parse_uuid_or_none(value: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(value)
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 class InsightRepositoryPG(InsightRepositoryPort):
@@ -134,6 +140,9 @@ class InsightRepositoryPG(InsightRepositoryPort):
         return [_row_to_insight(dict(row)) for row in rows]
 
     def get_by_id(self, project_id: str, insight_id: str) -> Insight | None:
+        parsed_id = _parse_uuid_or_none(insight_id)
+        if parsed_id is None:
+            return None
         with self.session.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -144,7 +153,7 @@ class InsightRepositoryPG(InsightRepositoryPort):
                       AND id = %(insight_id)s::uuid
                     LIMIT 1
                     """,
-                    {"project_id": project_id, "insight_id": insight_id},
+                    {"project_id": project_id, "insight_id": str(parsed_id)},
                 )
                 row = cur.fetchone()
         if not row:
@@ -195,6 +204,9 @@ class InsightRepositoryPG(InsightRepositoryPort):
         return InsightSummary(new_count_total=total, new_count_high_severity=high, top_insights=top_insights)
 
     def record_action(self, insight_id: str, project_id: str, user_id: str, action: str, new_status: str) -> None:
+        parsed_id = _parse_uuid_or_none(insight_id)
+        if parsed_id is None:
+            raise ValueError("insight_id_invalido")
         with self.session.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -204,7 +216,7 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     """,
                     {
                         "id": str(uuid.uuid4()),
-                        "insight_id": insight_id,
+                        "insight_id": str(parsed_id),
                         "project_id": project_id,
                         "user_id": user_id,
                         "action": action,
@@ -214,9 +226,9 @@ class InsightRepositoryPG(InsightRepositoryPort):
                     """
                     UPDATE ai_insights
                     SET status = %(status)s
-                    WHERE id = %(insight_id)s AND project_id = %(project_id)s
+                    WHERE id = %(insight_id)s::uuid AND project_id = %(project_id)s
                     """,
-                    {"status": new_status, "insight_id": insight_id, "project_id": project_id},
+                    {"status": new_status, "insight_id": str(parsed_id), "project_id": project_id},
                 )
             conn.commit()
 

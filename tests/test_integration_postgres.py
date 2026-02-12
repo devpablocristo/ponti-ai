@@ -8,6 +8,8 @@ from app.config import Settings
 from adapters.outbound.rag.ingest import ingest_documents
 from adapters.outbound.rag.search import search_documents
 
+HANDLED_INTEGRATION_SETUP_ERRORS = (psycopg.Error, OSError, RuntimeError, ValueError)
+
 
 @pytest.mark.integration
 def test_rag_ingest_and_search() -> None:
@@ -103,7 +105,7 @@ def test_rag_ingest_and_search() -> None:
                     """
                 )
             conn.commit()
-    except Exception as exc:  # noqa: BLE001
+    except HANDLED_INTEGRATION_SETUP_ERRORS as exc:
         pytest.skip(f"No se pudo preparar DB para test de integracion: {exc}")
 
     class Doc:

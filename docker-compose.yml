@@ -52,7 +52,8 @@ services:
       - LLM_PROVIDER=ollama
       - LLM_BASE_URL=http://ollama:11434
       - LLM_MODEL=llama3.1
-      - LLM_TIMEOUT_S=120
+      - LLM_TIMEOUT_S=20
+      - LLM_MAX_RETRIES=1
       - EMBEDDING_PROVIDER=ollama
       - EMBEDDING_MODEL=nomic-embed-text
       - INSIGHTS_RATIO_HIGH=0.5

@@ -53,7 +53,6 @@ Por que normalizar?
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import joblib
 import numpy as np

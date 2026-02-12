@@ -1,3 +1,4 @@
+from application.insights.dto import QueueRecomputeEventResult
 from application.insights.ports.recompute_queue import RecomputeQueuePort
 
 
@@ -11,10 +12,14 @@ class QueueRecomputeEvent:
         source: str,
         reason: str | None,
         debounce_seconds: int,
-    ) -> dict[str, str]:
-        return self.queue_repo.enqueue_event(
+    ) -> QueueRecomputeEventResult:
+        result = self.queue_repo.enqueue_event(
             project_id=project_id,
             source=source,
             reason=reason,
             debounce_seconds=debounce_seconds,
+        )
+        return QueueRecomputeEventResult(
+            status=str(result["status"]),
+            project_id=str(result["project_id"]),
         )

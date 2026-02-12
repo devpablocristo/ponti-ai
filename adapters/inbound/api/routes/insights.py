@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from adapters.inbound.api.auth.headers import AuthContext, require_headers
 from adapters.inbound.api.dependencies import AppContainer, get_container
@@ -18,6 +18,37 @@ from adapters.outbound.observability.metrics import inc_counter, observe_ms
 router = APIRouter()
 
 
+def _to_insight_item(insight) -> InsightItem:
+    return InsightItem(
+        id=insight.id,
+        project_id=insight.project_id,
+        entity_type=insight.entity_type,
+        entity_id=insight.entity_id,
+        type=insight.type,
+        severity=insight.severity,
+        priority=insight.priority,
+        title=insight.title,
+        summary=insight.summary,
+        evidence=insight.evidence,
+        explanations=insight.explanations,
+        action=insight.action,
+        model_version=insight.model_version,
+        features_version=insight.features_version,
+        computed_at=insight.computed_at.isoformat(),
+        valid_until=insight.valid_until.isoformat(),
+        status=insight.status,
+        impact_min=insight.impact_min,
+        impact_max=insight.impact_max,
+        impact_unit=insight.impact_unit,
+        confidence=insight.confidence,
+        dedupe_key=insight.dedupe_key,
+        cooldown_until=insight.cooldown_until.isoformat() if insight.cooldown_until else None,
+        computed_by=insight.computed_by,
+        job_run_id=insight.job_run_id,
+        rules_version=insight.rules_version,
+    )
+
+
 @router.post("/v1/insights/compute", response_model=ComputeInsightsResponse)
 def compute_insights(
     auth: AuthContext = Depends(require_headers),
@@ -28,24 +59,24 @@ def compute_insights(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
     inc_counter("insights.compute.count", 1)
-    inc_counter("insights.compute.rules_created", int(result.get("rules_insights_created", 0)))
-    inc_counter("insights.compute.ml_created", int(result.get("ml_insights_created", 0)))
+    inc_counter("insights.compute.rules_created", int(result.rules_insights_created))
+    inc_counter("insights.compute.ml_created", int(result.ml_insights_created))
     log_event(
         "insights.compute",
         {
-            "request_id": result["request_id"],
+            "request_id": result.request_id,
             "project_id": auth.project_id,
-            "computed": result["computed"],
-            "created": result["insights_created"],
-            "rules_created": int(result.get("rules_insights_created", 0)),
-            "ml_created": int(result.get("ml_insights_created", 0)),
+            "computed": result.computed,
+            "created": result.insights_created,
+            "rules_created": int(result.rules_insights_created),
+            "ml_created": int(result.ml_insights_created),
             "status": "ok",
         },
     )
     return ComputeInsightsResponse(
-        request_id=result["request_id"],
-        computed=result["computed"],
-        insights_created=result["insights_created"],
+        request_id=result.request_id,
+        computed=result.computed,
+        insights_created=result.insights_created,
     )
 
 
@@ -62,37 +93,7 @@ def get_insights(
         entity_type=entity_type,
         entity_id=entity_id,
     )
-    items = [
-        InsightItem(
-            id=insight.id,
-            project_id=insight.project_id,
-            entity_type=insight.entity_type,
-            entity_id=insight.entity_id,
-            type=insight.type,
-            severity=insight.severity,
-            priority=insight.priority,
-            title=insight.title,
-            summary=insight.summary,
-            evidence=insight.evidence,
-            explanations=insight.explanations,
-            action=insight.action,
-            model_version=insight.model_version,
-            features_version=insight.features_version,
-            computed_at=insight.computed_at.isoformat(),
-            valid_until=insight.valid_until.isoformat(),
-            status=insight.status,
-            impact_min=insight.impact_min,
-            impact_max=insight.impact_max,
-            impact_unit=insight.impact_unit,
-            confidence=insight.confidence,
-            dedupe_key=insight.dedupe_key,
-            cooldown_until=insight.cooldown_until.isoformat() if insight.cooldown_until else None,
-            computed_by=insight.computed_by,
-            job_run_id=insight.job_run_id,
-            rules_version=insight.rules_version,
-        )
-        for insight in insights
-    ]
+    items = [_to_insight_item(insight) for insight in insights]
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.get.duration_ms", duration_ms)
     inc_counter("insights.get.count", 1)
@@ -116,37 +117,7 @@ def get_summary(
 ) -> SummaryResponse:
     started = time.time()
     summary = container.get_summary.handle(project_id=auth.project_id)
-    top_items = [
-        InsightItem(
-            id=insight.id,
-            project_id=insight.project_id,
-            entity_type=insight.entity_type,
-            entity_id=insight.entity_id,
-            type=insight.type,
-            severity=insight.severity,
-            priority=insight.priority,
-            title=insight.title,
-            summary=insight.summary,
-            evidence=insight.evidence,
-            explanations=insight.explanations,
-            action=insight.action,
-            model_version=insight.model_version,
-            features_version=insight.features_version,
-            computed_at=insight.computed_at.isoformat(),
-            valid_until=insight.valid_until.isoformat(),
-            status=insight.status,
-            impact_min=insight.impact_min,
-            impact_max=insight.impact_max,
-            impact_unit=insight.impact_unit,
-            confidence=insight.confidence,
-            dedupe_key=insight.dedupe_key,
-            cooldown_until=insight.cooldown_until.isoformat() if insight.cooldown_until else None,
-            computed_by=insight.computed_by,
-            job_run_id=insight.job_run_id,
-            rules_version=insight.rules_version,
-        )
-        for insight in summary.top_insights
-    ]
+    top_items = [_to_insight_item(insight) for insight in summary.top_insights]
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.summary.duration_ms", duration_ms)
     inc_counter("insights.summary.count", 1)
@@ -174,23 +145,28 @@ def record_action(
     container: AppContainer = Depends(get_container),
 ) -> ActionResponse:
     started = time.time()
-    result = container.record_action.handle(
-        insight_id=insight_id,
-        project_id=auth.project_id,
-        user_id=auth.user_id,
-        action=req.action,
-        new_status=req.new_status,
-    )
+    try:
+        result = container.record_action.handle(
+            insight_id=insight_id,
+            project_id=auth.project_id,
+            user_id=auth.user_id,
+            action=req.action,
+            new_status=req.new_status,
+        )
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Insight no encontrado")
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="insight_id invalido")
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.action.duration_ms", duration_ms)
     inc_counter("insights.action.count", 1)
     log_event(
         "insights.action",
         {
-            "request_id": result["request_id"],
+            "request_id": result.request_id,
             "project_id": auth.project_id,
             "insight_id": insight_id,
             "status": "ok",
         },
     )
-    return ActionResponse(request_id=result["request_id"], status="ok")
+    return ActionResponse(request_id=result.request_id, status="ok")

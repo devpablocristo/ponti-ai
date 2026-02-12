@@ -122,7 +122,7 @@ def test_recompute_baselines_lock() -> None:
         batch_size=100,
         lock_key=1,
     )
-    assert result["status"] == "locked"
+    assert result.status == "locked"
 
 
 def test_recompute_baselines_uses_cohort_and_projects() -> None:
@@ -145,12 +145,12 @@ def test_recompute_baselines_uses_cohort_and_projects() -> None:
         batch_size=100,
         lock_key=1,
     )
-    assert result["status"] == "ok"
+    assert result.status == "ok"
     assert baseline_computer.last_cohort is not None
     assert baseline_computer.last_cohort.size_small_max == 200
     assert baseline_computer.last_cohort.size_medium_max == 1000
-    assert result["cohort_saved"] == 1
-    assert result["project_saved"] == 2
+    assert result.cohort_saved == 1
+    assert result.project_saved == 2
 
 
 def test_anomaly_runner_fallback_to_cohort() -> None:

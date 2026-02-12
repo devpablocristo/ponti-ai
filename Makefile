@@ -28,7 +28,7 @@ run:
 	uvicorn app.main:app --reload --port $(UVICORN_PORT)
 
 test:
-	python -m pytest
+	PYTHONPATH=. python -m pytest
 
 train-ml:
 	$(COMPOSE) run --rm ai-copilot python -m ml.scripts.train --activate

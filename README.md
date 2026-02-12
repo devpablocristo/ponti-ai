@@ -174,12 +174,14 @@ curl -s -X POST http://localhost:8090/v1/jobs/retrain-ml-if-needed \
 - `POST /v1/insights/{insight_id}/actions`
 - `POST /v1/jobs/recompute-active`
 - `POST /v1/jobs/recompute-baselines`
+- `POST /v1/jobs/recompute-queue/enqueue`
+- `POST /v1/jobs/recompute-queue/process`
 - `POST /v1/jobs/retrain-ml`
 - `POST /v1/jobs/retrain-ml-if-needed`
 
-## TODO acordado
-- Observabilidad avanzada (SLO/alertas/dashboards externos) queda en TODO.
-- Runbook operativo formal (incidentes + rollback/recovery paso a paso) queda en TODO.
+## Operacion y calidad
+- Runbook operativo: `docs/OPERATIONS_RUNBOOK.md`
+- SLOs y alertas base: `docs/OBSERVABILIDAD_SLO.md`
 
 ## Headers requeridos
 ```

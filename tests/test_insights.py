@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from application.insights.ports.feature_repository import FeatureRepositoryPort, FeatureValue
 from application.insights.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
 from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
@@ -280,7 +282,7 @@ def test_compute_insights_creates_records() -> None:
         llm_model="stub",
     )
     result = use_case.handle(project_id="p1", user_id="u1")
-    assert result["insights_created"] == 1
+    assert result.insights_created == 1
 
 
 def test_compute_insights_includes_ml_records() -> None:
@@ -300,9 +302,9 @@ def test_compute_insights_includes_ml_records() -> None:
         ml_detector=FakeMLDetector(),
     )
     result = use_case.handle(project_id="p1", user_id="u1")
-    assert result["insights_created"] == 2
-    assert result["rules_insights_created"] == 1
-    assert result["ml_insights_created"] == 1
+    assert result.insights_created == 2
+    assert result.rules_insights_created == 1
+    assert result.ml_insights_created == 1
     assert any(item.id == "ins-ml-1" for item in repo.items)
 
 
@@ -322,9 +324,9 @@ def test_compute_insights_continues_when_ml_fails() -> None:
         ml_detector=FakeMLDetector(should_fail=True),
     )
     result = use_case.handle(project_id="p1", user_id="u1")
-    assert result["insights_created"] == 1
-    assert result["rules_insights_created"] == 1
-    assert result["ml_insights_created"] == 0
+    assert result.insights_created == 1
+    assert result.rules_insights_created == 1
+    assert result.ml_insights_created == 0
 
 
 def test_compute_insights_creates_proposal_when_gating_passes() -> None:
@@ -388,6 +390,12 @@ def test_action_updates_status() -> None:
     RecordAction(repo, FakeAuditLogger()).handle("ins-1", "p1", "u1", "ignored", "ignored")
     summary = GetSummary(repo).handle("p1")
     assert summary.new_count_total == 0
+
+
+def test_action_missing_insight_raises_key_error() -> None:
+    repo = FakeInsightRepo()
+    with pytest.raises(KeyError):
+        RecordAction(repo, FakeAuditLogger()).handle("missing-id", "p1", "u1", "ack", "acknowledged")
 
 
 def test_compute_insights_respects_cooldown() -> None:
@@ -455,7 +463,7 @@ def test_compute_insights_respects_cooldown() -> None:
         llm_provider="stub",
         llm_model="stub",
     ).handle("p1", "u1")
-    assert result["insights_created"] == 0
+    assert result.insights_created == 0
 
 
 def test_anomaly_runner_sets_impact_and_confidence() -> None:

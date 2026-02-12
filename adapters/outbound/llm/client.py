@@ -9,6 +9,10 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential_jitter
 from adapters.outbound.observability.logging import get_logger
 from app.config import Settings
 
+HANDLED_LLM_TRANSPORT_ERRORS = (ValueError, TypeError, OSError)
+HANDLED_LLM_CONTENT_ERRORS = (KeyError, IndexError, TypeError, AttributeError, ValueError)
+HANDLED_HTTP_DETAIL_ERRORS = (ValueError, TypeError, KeyError)
+
 
 class LLMError(RuntimeError):
     pass
@@ -133,12 +137,12 @@ class OpenAIChatCompletionsClient(LLMClient):
             raise LLMError(f"LLM HTTP {exc.response.status_code}: {detail}") from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"LLM HTTP error: {exc}") from exc
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_LLM_TRANSPORT_ERRORS as exc:
             raise LLMError(f"LLM error: {exc}") from exc
 
         try:
             content = data["choices"][0]["message"]["content"]
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_LLM_CONTENT_ERRORS as exc:
             raise LLMError("Respuesta LLM inválida: missing choices[0].message.content") from exc
 
         return LLMCompletion(provider="openai", model=self.settings.llm_model, content=content, raw=data)
@@ -214,7 +218,7 @@ class GoogleAIStudioGenerateContentClient(LLMClient):
             raise LLMError(f"LLM HTTP {exc.response.status_code}: {detail}") from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"LLM HTTP error: {exc}") from exc
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_LLM_TRANSPORT_ERRORS as exc:
             raise LLMError(f"LLM error: {exc}") from exc
 
         try:
@@ -244,7 +248,9 @@ class OllamaChatClient(LLMClient):
         self.base_url = (settings.llm_base_url or "http://localhost:11434").rstrip("/")
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
-        attempt_limit = max(int(self.settings.llm_max_retries), 1)
+        # En local Ollama puede quedar sin respuesta cuando el modelo no esta listo.
+        # Mantenemos una sola tentativa para no bloquear requests HTTP por minutos.
+        attempt_limit = 1
         retrying = Retrying(
             stop=stop_after_attempt(attempt_limit),
             wait=wait_exponential_jitter(initial=0.5, max=4.0),
@@ -256,7 +262,8 @@ class OllamaChatClient(LLMClient):
         raise LLMError("No se pudo obtener respuesta del LLM (retries agotados)")
 
     def _complete_json_once(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
-        timeout = httpx.Timeout(self.settings.llm_timeout_s)
+        # Protege la latencia de endpoints copilot aun si el timeout global es alto.
+        timeout = httpx.Timeout(min(float(self.settings.llm_timeout_s), 30.0))
 
         digest = hashlib.sha256((system_prompt + "\n" + user_prompt).encode("utf-8")).hexdigest()[:12]
         self.logger.info(
@@ -295,7 +302,7 @@ class OllamaChatClient(LLMClient):
             raise LLMError(f"LLM HTTP {exc.response.status_code}: {detail}") from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"LLM HTTP error: {exc}") from exc
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_LLM_TRANSPORT_ERRORS as exc:
             raise LLMError(f"LLM error: {exc}") from exc
 
         try:
@@ -306,7 +313,7 @@ class OllamaChatClient(LLMClient):
                 content = str(data.get("response") or "").strip()
             if not content:
                 raise LLMError("Respuesta LLM inválida: empty content")
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_LLM_CONTENT_ERRORS as exc:
             raise LLMError("Respuesta LLM inválida: missing message.content/response") from exc
 
         return LLMCompletion(provider="ollama", model=self.settings.llm_model, content=content, raw=data)
@@ -341,10 +348,10 @@ def _safe_http_error_detail(resp: httpx.Response) -> str:
             msg = payload["error"].get("message")
             if isinstance(msg, str) and msg.strip():
                 return msg.strip()[:300]
-    except Exception:  # noqa: BLE001
+    except HANDLED_HTTP_DETAIL_ERRORS:
         pass
     # Fallback: texto truncado.
     try:
         return (resp.text or "").strip()[:300] or "unknown_error"
-    except Exception:  # noqa: BLE001
+    except HANDLED_LLM_TRANSPORT_ERRORS:
         return "unknown_error"

@@ -282,10 +282,10 @@ Métricas clave:
 - Runbook de rollback validado (`POST /v1/ml/rollback`) y probado en staging.
 - Reentrenamiento periodico programado (`POST /v1/jobs/retrain-ml` o scheduler externo).
 
-## 12) TODO acordado
-- Observabilidad operativa avanzada (Prometheus/Grafana/Datadog con alertas SLO) queda en TODO.
-- Runbook operativo de incidentes (on-call, degradacion, rollback, recovery) queda en TODO.
-- Objetivo: mantener estos 2 items fuera de este ciclo de implementacion.
+## 12) Operacion documentada
+- Runbook operativo de incidentes/recovery: `docs/OPERATIONS_RUNBOOK.md`.
+- SLOs/alertas operativas base: `docs/OBSERVABILIDAD_SLO.md`.
+- Integraciones externas (Prometheus/Grafana/Datadog) se montan sobre las mismas metricas del endpoint `/metrics`.
 
 ## 13) Traduccion para dev Go
 - `@dataclass(frozen=True)` ~= `struct` inmutable
@@ -303,10 +303,8 @@ Métricas clave:
 - ML integrado al compute
 
 ### Aun MVP/stub
-- RAG embeddings usa stub deterministico (`adapters/outbound/rag/embeddings.py`)
-- el registry de modelos ya es DB + filesystem, pero sin almacenamiento remoto de artefactos
-- faltan alertas externas y tableros operativos formales (pendiente en TODO de observabilidad)
-- faltan SLO/alertas externas (Prometheus/Datadog) y dashboard operativo formal
+- RAG embeddings puede operar en modo stub deterministico (`adapters/outbound/rag/embeddings.py`) o proveedores reales.
+- El registry de modelos es DB + filesystem; almacenamiento remoto de artefactos aun no implementado.
 
 ## 15) Ejemplo real de flujo operativo
 1. `make up`

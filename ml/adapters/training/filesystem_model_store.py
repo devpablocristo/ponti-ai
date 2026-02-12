@@ -34,7 +34,7 @@ En Python moderno usas pathlib:
 
 Beneficios:
 - Orientado a objetos (mas legible que strings)
-- Cross-platform (maneja / vs \)
+- Cross-platform (maneja / y \\)
 - Operaciones utiles integradas
 
 

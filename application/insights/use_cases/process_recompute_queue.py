@@ -2,10 +2,13 @@ import hashlib
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from application.insights.dto import ProcessQueueItemResult, ProcessRecomputeQueueResult
 from application.insights.ports.insight_repository import InsightRepositoryPort
 from application.insights.ports.job_lock import JobLockPort
 from application.insights.ports.recompute_queue import RecomputeQueueItem, RecomputeQueuePort
 from application.insights.use_cases.compute_insights import ComputeInsights
+
+HANDLED_PROCESS_QUEUE_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
 
 
 def _project_lock_key(base_key: int, project_id: str) -> int:
@@ -27,7 +30,7 @@ class ProcessRecomputeQueue:
         self.insight_repo = insight_repo
         self.job_lock = job_lock
 
-    def _process_one(self, item: RecomputeQueueItem, lock_key_base: int) -> dict[str, str]:
+    def _process_one(self, item: RecomputeQueueItem, lock_key_base: int) -> ProcessQueueItemResult:
         lock_key = _project_lock_key(lock_key_base, item.project_id)
         if not self.job_lock.try_lock(lock_key):
             self.queue_repo.mark_failed(
@@ -35,7 +38,7 @@ class ProcessRecomputeQueue:
                 error="project_locked",
                 retry_after_seconds=30,
             )
-            return {"status": "locked", "project_id": item.project_id}
+            return ProcessQueueItemResult(status="locked", project_id=item.project_id)
         try:
             self.compute_insights.handle(
                 project_id=item.project_id,
@@ -45,14 +48,14 @@ class ProcessRecomputeQueue:
             )
             self.insight_repo.mark_recomputed(item.project_id)
             self.queue_repo.mark_done(item.project_id)
-            return {"status": "ok", "project_id": item.project_id}
-        except Exception as exc:  # noqa: BLE001
+            return ProcessQueueItemResult(status="ok", project_id=item.project_id)
+        except HANDLED_PROCESS_QUEUE_ERRORS as exc:
             self.queue_repo.mark_failed(
                 project_id=item.project_id,
                 error=str(exc),
                 retry_after_seconds=60,
             )
-            return {"status": "error", "project_id": item.project_id}
+            return ProcessQueueItemResult(status="error", project_id=item.project_id)
         finally:
             self.job_lock.release(lock_key)
 
@@ -62,14 +65,14 @@ class ProcessRecomputeQueue:
         workers: int,
         lock_key_base: int,
         stale_lock_seconds: int = 300,
-    ) -> dict[str, int]:
+    ) -> ProcessRecomputeQueueResult:
         claimed = self.queue_repo.claim_due(
             limit=max(1, int(limit)),
             worker_id=f"worker-{uuid.uuid4()}",
             stale_after_seconds=max(30, int(stale_lock_seconds)),
         )
         if not claimed:
-            return {"claimed": 0, "processed": 0, "ok": 0, "locked": 0, "errors": 0}
+            return ProcessRecomputeQueueResult(claimed=0, processed=0, ok=0, locked=0, errors=0)
 
         max_workers = max(1, min(int(workers), len(claimed)))
         ok = 0
@@ -80,7 +83,7 @@ class ProcessRecomputeQueue:
             futures = [pool.submit(self._process_one, item, lock_key_base) for item in claimed]
             for future in as_completed(futures):
                 result = future.result()
-                status = result.get("status")
+                status = result.status
                 if status == "ok":
                     ok += 1
                 elif status == "locked":
@@ -88,10 +91,10 @@ class ProcessRecomputeQueue:
                 else:
                     errors += 1
 
-        return {
-            "claimed": len(claimed),
-            "processed": len(claimed),
-            "ok": ok,
-            "locked": locked,
-            "errors": errors,
-        }
+        return ProcessRecomputeQueueResult(
+            claimed=len(claimed),
+            processed=len(claimed),
+            ok=ok,
+            locked=locked,
+            errors=errors,
+        )

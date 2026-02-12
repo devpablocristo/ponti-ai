@@ -6,12 +6,14 @@ from typing import Any
 def get_logger(name: str = "ai-copilot") -> logging.Logger:
     logger = logging.getLogger(name)
     if logger.handlers:
+        logger.propagate = False
         return logger
     handler = logging.StreamHandler()
     formatter = logging.Formatter("%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+    logger.propagate = False
     return logger
 
 

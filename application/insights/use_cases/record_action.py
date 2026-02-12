@@ -1,8 +1,11 @@
 import time
 import uuid
 
+from application.insights.dto import RecordActionResult
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.insights.ports.insight_repository import InsightRepositoryPort
+
+HANDLED_RECORD_ACTION_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
 
 
 class RecordAction:
@@ -17,17 +20,21 @@ class RecordAction:
         user_id: str,
         action: str,
         new_status: str,
-    ) -> dict[str, str]:
+    ) -> RecordActionResult:
         request_id = str(uuid.uuid4())
         started = time.time()
         status = "ok"
         error = None
+        caught_exc: Exception | None = None
 
         try:
+            if self.insight_repo.get_by_id(project_id, insight_id) is None:
+                raise KeyError("insight_not_found")
             self.insight_repo.record_action(insight_id, project_id, user_id, action, new_status)
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_RECORD_ACTION_ERRORS as exc:
             status = "error"
             error = str(exc)
+            caught_exc = exc
 
         duration_ms = int((time.time() - started) * 1000)
         self.audit_logger.log(
@@ -46,4 +53,7 @@ class RecordAction:
             )
         )
 
-        return {"request_id": request_id}
+        if caught_exc is not None:
+            raise caught_exc
+
+        return RecordActionResult(request_id=request_id)

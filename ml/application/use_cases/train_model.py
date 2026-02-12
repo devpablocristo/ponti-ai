@@ -54,6 +54,8 @@ from ml.application.ports.model_trainer import ModelTrainerPort
 from ml.config import MLConfig
 from ml.domain.entities import ModelInfo
 
+HANDLED_THRESHOLD_SUGGEST_ERRORS = (ValueError, RuntimeError, OSError, KeyError, TypeError)
+
 
 @dataclass
 class TrainModelResult:
@@ -258,7 +260,7 @@ class TrainModelUseCase:
         suggest_fn = getattr(self.data_loader, "suggest_anomaly_threshold")
         try:
             value = suggest_fn(default_threshold)
-        except Exception:  # noqa: BLE001
+        except HANDLED_THRESHOLD_SUGGEST_ERRORS:
             return None
         if value is None:
             return None

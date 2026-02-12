@@ -58,15 +58,12 @@ Es similar a la libreria flag de Go:
 
 import argparse
 import sys
-from datetime import datetime
-from pathlib import Path
-
-# Agregar el directorio raiz al path para imports
-# Esto permite ejecutar: python -m ml.scripts.train
-ROOT_DIR = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+import traceback
 
 from dotenv import load_dotenv
+
+HANDLED_TRAIN_INIT_ERRORS = (ImportError, ValueError, RuntimeError, OSError, KeyError)
+HANDLED_TRAIN_EXEC_ERRORS = (ValueError, RuntimeError, OSError, KeyError)
 
 
 def main():
@@ -147,7 +144,7 @@ Ejemplos:
     print("[1/4] Inicializando componentes...")
     try:
         ml = MLFacade.from_settings(settings)
-    except Exception as e:
+    except HANDLED_TRAIN_INIT_ERRORS as e:
         print(f"[ERROR] No se pudo inicializar ML: {e}")
         return 1
 
@@ -173,9 +170,8 @@ Ejemplos:
     except ValueError as e:
         print(f"[ERROR] {e}")
         return 1
-    except Exception as e:
+    except HANDLED_TRAIN_EXEC_ERRORS as e:
         print(f"[ERROR] Error durante entrenamiento: {e}")
-        import traceback
         traceback.print_exc()
         return 1
 

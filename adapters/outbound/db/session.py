@@ -5,6 +5,8 @@ from psycopg.rows import dict_row
 
 from app.config import Settings
 
+HANDLED_DB_HEALTH_ERRORS = (psycopg.Error, ValueError, OSError)
+
 
 class DBSession:
     def __init__(self, settings: Settings) -> None:
@@ -26,5 +28,5 @@ def check_db_health(settings: Settings) -> bool:
                 cur.execute("SELECT 1")
                 cur.fetchone()
         return True
-    except Exception:
+    except HANDLED_DB_HEALTH_ERRORS:
         return False

@@ -67,7 +67,7 @@ import hashlib
 from ml.config import MLConfig, load_ml_config
 from ml.domain.entities import Dataset, Prediction, ModelInfo
 from ml.application.use_cases.train_model import TrainModelUseCase, TrainModelResult
-from ml.application.use_cases.predict_anomaly import PredictAnomalyUseCase, PredictResult
+from ml.application.use_cases.predict_anomaly import PredictAnomalyUseCase
 from adapters.outbound.observability.metrics import inc_counter
 
 # Importamos adapters directamente (el facade conoce la implementacion)
@@ -79,6 +79,8 @@ from ml.adapters.training.filesystem_model_store import FileSystemModelStore
 # Importamos tipos del proyecto principal
 from application.insights.ports.feature_repository import FeatureValue
 from domain.insights.entities import Insight
+
+HANDLED_MODEL_LOAD_ERRORS = (FileNotFoundError, ValueError, RuntimeError, OSError)
 
 
 class MLFacade:
@@ -622,7 +624,7 @@ class MLFacade:
         try:
             _, info, _ = self._model_store.load(self.config.model_type, version)
             return info
-        except Exception:  # noqa: BLE001
+        except HANDLED_MODEL_LOAD_ERRORS:
             return None
 
     def _should_promote(self, *, candidate_info: ModelInfo, active_info: ModelInfo | None) -> tuple[bool, str]:

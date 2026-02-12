@@ -1,9 +1,9 @@
 import json
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from adapters.outbound.llm.client import LLMClient
+from adapters.outbound.llm.client import LLMClient, LLMError
 from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_PROMPT_VERSION,
     COPILOT_EXPLAIN_SYSTEM_PROMPT,
@@ -40,13 +40,13 @@ class CopilotExplainerLLM(CopilotExplainerPort):
             insight_json=json.dumps(_insight_to_prompt_dict(insight), ensure_ascii=True),
             proposal_json=json.dumps(proposal or {}, ensure_ascii=True),
         )
-        completion = self.llm.complete_json(system_prompt=COPILOT_EXPLAIN_SYSTEM_PROMPT, user_prompt=user_prompt)
         try:
+            completion = self.llm.complete_json(system_prompt=COPILOT_EXPLAIN_SYSTEM_PROMPT, user_prompt=user_prompt)
             payload = json.loads(completion.content)
-        except json.JSONDecodeError as exc:
-            raise ValueError("LLM devolvió JSON inválido (copilot)") from exc
-        out = _ExplainOut.model_validate(payload)
-        return out.model_dump()
+            out = _ExplainOut.model_validate(payload)
+            return out.model_dump()
+        except (LLMError, json.JSONDecodeError, ValueError):
+            return _fallback_explanation(insight=insight, mode=mode)
 
 
 def _insight_to_prompt_dict(insight: Insight) -> dict[str, Any]:
@@ -79,3 +79,16 @@ def _insight_to_prompt_dict(insight: Insight) -> dict[str, Any]:
         "rules_version": insight.rules_version,
     }
 
+
+def _fallback_explanation(*, insight: Insight, mode: CopilotExplainMode) -> dict[str, str]:
+    mode_text: dict[CopilotExplainMode, str] = {
+        "explain": "Explicacion operativa del insight",
+        "why": "Motivo de negocio y evidencia principal",
+        "next_steps": "Siguientes pasos recomendados",
+    }
+    base = f"{mode_text[mode]}: {insight.title}. {insight.summary}"
+    return {
+        "human_readable": base,
+        "audit_focused": f"Regla y evidencia: {insight.explanations} / {insight.evidence}",
+        "what_to_watch_next": "Monitorear severidad, estado y recurrencia del mismo dedupe_key.",
+    }

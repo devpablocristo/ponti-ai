@@ -1,5 +1,6 @@
 import uuid
 
+from application.insights.dto import RecomputeBaselinesResult
 from application.insights.ports.baseline_computer import BaselineComputerPort, CohortConfig
 from application.insights.ports.baseline_repository import BaselineRepositoryPort
 from application.insights.ports.job_lock import JobLockPort
@@ -27,9 +28,9 @@ class RecomputeBaselines:
         min_samples: int,
         batch_size: int,
         lock_key: int,
-    ) -> dict[str, int | str]:
+    ) -> RecomputeBaselinesResult:
         if not self.job_lock.try_lock(lock_key):
-            return {"status": "locked", "job_run_id": ""}
+            return RecomputeBaselinesResult(status="locked", job_run_id="", cohort_saved=0, project_saved=0)
 
         job_run_id = str(uuid.uuid4())
         cohort_saved = 0
@@ -54,9 +55,9 @@ class RecomputeBaselines:
         finally:
             self.job_lock.release(lock_key)
 
-        return {
-            "status": "ok",
-            "job_run_id": job_run_id,
-            "cohort_saved": cohort_saved,
-            "project_saved": project_saved,
-        }
+        return RecomputeBaselinesResult(
+            status="ok",
+            job_run_id=job_run_id,
+            cohort_saved=cohort_saved,
+            project_saved=project_saved,
+        )

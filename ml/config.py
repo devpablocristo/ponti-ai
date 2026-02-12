@@ -61,7 +61,7 @@ En lugar de 50 variables sueltas, agrupamos en dataclasses anidados:
             max_depth: 6
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 import os
 

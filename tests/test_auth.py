@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from fastapi import HTTPException
 

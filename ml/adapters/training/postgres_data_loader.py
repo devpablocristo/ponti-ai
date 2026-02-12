@@ -150,6 +150,15 @@ class PostgresDataLoader:
         if psycopg is None:
             return None
 
+        rows = self._fetch_threshold_rows()
+        pairs = self._extract_labeled_pairs(rows)
+        if not self._has_enough_feedback(pairs):
+            return None
+
+        candidates = self._build_threshold_candidates(pairs, default_threshold)
+        return self._pick_best_threshold(pairs, candidates, default_threshold)
+
+    def _fetch_threshold_rows(self) -> list[dict]:
         query = """
         SELECT
             (i.evidence_json->>'anomaly_score')::float AS score,
@@ -164,12 +173,13 @@ class PostgresDataLoader:
           AND (i.rules_version LIKE 'ml_%' OR i.model_version LIKE 'ml-%')
           AND a.action IN ('acknowledged', 'resolved', 'dismissed')
         """
-
         with psycopg.connect(self.dsn) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query)
-                rows = cur.fetchall()
+                return cur.fetchall()
 
+    @staticmethod
+    def _extract_labeled_pairs(rows: list[dict]) -> list[tuple[float, int]]:
         pairs: list[tuple[float, int]] = []
         for row in rows:
             score = row.get("score")
@@ -177,43 +187,58 @@ class PostgresDataLoader:
             if score is None or label is None:
                 continue
             pairs.append((float(score), int(label)))
+        return pairs
 
+    @staticmethod
+    def _has_enough_feedback(pairs: list[tuple[float, int]]) -> bool:
         if len(pairs) < 20:
-            return None
-
+            return False
         positives = sum(1 for _, label in pairs if label == 1)
         negatives = sum(1 for _, label in pairs if label == 0)
-        if positives < 5 or negatives < 5:
-            return None
+        return positives >= 5 and negatives >= 5
 
+    @staticmethod
+    def _build_threshold_candidates(
+        pairs: list[tuple[float, int]],
+        default_threshold: float,
+    ) -> list[float]:
         scores_sorted = sorted(score for score, _ in pairs)
         candidates: list[float] = []
         for idx in range(1, 20):
             pos = int((idx / 20.0) * (len(scores_sorted) - 1))
             candidates.append(scores_sorted[pos])
         candidates.append(float(default_threshold))
-        candidates = sorted(set(max(0.01, min(0.99, value)) for value in candidates))
+        return sorted({max(0.01, min(0.99, value)) for value in candidates})
 
+    @staticmethod
+    def _pick_best_threshold(
+        pairs: list[tuple[float, int]],
+        candidates: list[float],
+        default_threshold: float,
+    ) -> float:
         best_threshold = float(default_threshold)
         best_f1 = -1.0
         for threshold in candidates:
-            tp = fp = fn = 0
-            for score, label in pairs:
-                predicted = 1 if score >= threshold else 0
-                if predicted == 1 and label == 1:
-                    tp += 1
-                elif predicted == 1 and label == 0:
-                    fp += 1
-                elif predicted == 0 and label == 1:
-                    fn += 1
-            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+            f1 = PostgresDataLoader._threshold_f1(pairs, threshold)
             if f1 > best_f1:
                 best_f1 = f1
                 best_threshold = threshold
-
         return best_threshold
+
+    @staticmethod
+    def _threshold_f1(pairs: list[tuple[float, int]], threshold: float) -> float:
+        tp = fp = fn = 0
+        for score, label in pairs:
+            predicted = 1 if score >= threshold else 0
+            if predicted == 1 and label == 1:
+                tp += 1
+            elif predicted == 1 and label == 0:
+                fp += 1
+            elif predicted == 0 and label == 1:
+                fn += 1
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        return (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
 
     def _fetch_project_ids(self, conn) -> list[str]:
         query = (

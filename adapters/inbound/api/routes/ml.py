@@ -10,6 +10,7 @@ from adapters.inbound.api.schemas.insights import (
 )
 
 router = APIRouter()
+HANDLED_ML_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
 
 
 @router.get("/v1/ml/status", response_model=MLStatusResponse)
@@ -89,7 +90,7 @@ def ml_activate(
             rollback_target_version=None,
             error=None,
         )
-    except Exception as exc:  # noqa: BLE001
+    except HANDLED_ML_ERRORS as exc:
         return MLVersionChangeResponse(
             status="error",
             error=str(exc),
@@ -117,7 +118,7 @@ def ml_rollback(
             rollback_target_version=result.get("rollback_target_version"),
             error=None,
         )
-    except Exception as exc:  # noqa: BLE001
+    except HANDLED_ML_ERRORS as exc:
         return MLVersionChangeResponse(
             status="error",
             error=str(exc),

@@ -3,15 +3,20 @@ import uuid
 from dataclasses import replace
 from datetime import datetime, timezone
 
+from application.insights.dto import ComputeInsightsResult
 from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
 from application.insights.ports.feature_repository import FeatureRepositoryPort
 from application.insights.ports.insight_history import InsightHistoryPort
 from application.insights.ports.ml_detector import MLDetectorPort
+from application.insights.ports.metrics import MetricsPort
 from application.insights.ports.insight_repository import InsightRepositoryPort
 from application.insights.ports.insight_planner import InsightPlannerPort
 from application.insights.ports.model_runner import ModelRunnerPort
 from application.insights.ports.proposal_store import ProposalStorePort
-from adapters.outbound.observability.metrics import inc_counter
+
+HANDLED_COMPUTE_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
+HANDLED_ML_DETECT_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
+HANDLED_PROPOSAL_ERRORS = (ValueError, RuntimeError, KeyError, OSError)
 
 
 class ComputeInsights:
@@ -30,6 +35,7 @@ class ComputeInsights:
         llm_model: str,
         ml_detector: MLDetectorPort | None = None,
         ml_shadow_mode: bool = False,
+        metrics: MetricsPort | None = None,
     ) -> None:
         self.feature_repo = feature_repo
         self.model_runner = model_runner
@@ -44,6 +50,7 @@ class ComputeInsights:
         self.llm_model = llm_model
         self.ml_detector = ml_detector
         self.ml_shadow_mode = ml_shadow_mode
+        self.metrics = metrics
 
     def handle(
         self,
@@ -51,7 +58,7 @@ class ComputeInsights:
         user_id: str,
         computed_by: str = "on_demand",
         job_run_id: str | None = None,
-    ) -> dict[str, int | str]:
+    ) -> ComputeInsightsResult:
         request_id = str(uuid.uuid4())
         started = time.time()
         status = "ok"
@@ -68,7 +75,7 @@ class ComputeInsights:
             if self.ml_detector is not None:
                 try:
                     insights.extend(self.ml_detector.detect_anomalies(project_id, features))
-                except Exception:  # noqa: BLE001
+                except HANDLED_ML_DETECT_ERRORS:
                     # Fail-open: el flujo de insights no depende de ML.
                     pass
             now = datetime.now(timezone.utc)
@@ -102,13 +109,13 @@ class ComputeInsights:
                 if str(insight.rules_version).startswith("ml_") or str(insight.model_version).startswith("ml-")
             )
             rules_created = max(created - ml_created, 0)
-            if shadowed_count > 0:
-                inc_counter("insights.compute.ml_shadow.count", shadowed_count)
+            if shadowed_count > 0 and self.metrics is not None:
+                self.metrics.inc_counter("insights.compute.ml_shadow.count", shadowed_count)
 
             # Insights v2: análisis LLM + persistencia de propuesta (fail-open).
             for insight in filtered:
                 self._maybe_generate_proposal(project_id=project_id, insight=insight)
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_COMPUTE_ERRORS as exc:
             status = "error"
             error = str(exc)
 
@@ -133,13 +140,13 @@ class ComputeInsights:
             )
         )
 
-        return {
-            "request_id": request_id,
-            "computed": computed,
-            "insights_created": created,
-            "rules_insights_created": rules_created,
-            "ml_insights_created": ml_created,
-        }
+        return ComputeInsightsResult(
+            request_id=request_id,
+            computed=computed,
+            insights_created=created,
+            rules_insights_created=rules_created,
+            ml_insights_created=ml_created,
+        )
 
     def _maybe_generate_proposal(self, *, project_id: str, insight) -> None:
         # Gating determinístico (antes del LLM).
@@ -206,7 +213,7 @@ class ComputeInsights:
                 status="ok",
                 error_message=None,
             )
-        except Exception as exc:  # noqa: BLE001
+        except HANDLED_PROPOSAL_ERRORS as exc:
             self.proposal_store.insert(
                 insight_id=insight.id,
                 project_id=project_id,

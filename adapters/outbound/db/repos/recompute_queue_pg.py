@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from adapters.outbound.db.session import DBSession
 from app.config import Settings
 from application.insights.ports.recompute_queue import RecomputeQueueItem, RecomputeQueuePort

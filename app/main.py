@@ -8,7 +8,6 @@ from adapters.inbound.api.routes.insights import router as insights_router
 from adapters.inbound.api.routes.jobs import router as jobs_router
 from adapters.inbound.api.routes.ml import router as ml_router
 from adapters.outbound.db.repos.audit_logger_pg import AuditLoggerPG
-from adapters.outbound.db.repos.insight_reader_pg import InsightReaderPG
 from adapters.outbound.db.repos.insight_history_pg import InsightHistoryPG
 from adapters.outbound.db.job_lock_pg import JobLockPG
 from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
@@ -21,6 +20,7 @@ from adapters.outbound.llm.client import build_llm_client
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
 from adapters.outbound.llm.insight_planner import InsightPlannerLLM
 from adapters.outbound.models.anomaly_runner import AnomalyRunner
+from adapters.outbound.observability.metrics_adapter import MetricsAdapter
 from adapters.outbound.sql.baseline_computer_pg import BaselineComputerPG
 from adapters.outbound.sql.project_repo_pg import ProjectRepositoryPG
 from app.config import load_settings
@@ -34,6 +34,8 @@ from application.insights.use_cases.recompute_active import RecomputeActive
 from application.insights.use_cases.recompute_baselines import RecomputeBaselines
 from application.insights.use_cases.process_recompute_queue import ProcessRecomputeQueue
 from application.insights.use_cases.queue_recompute_event import QueueRecomputeEvent
+
+HANDLED_ML_INIT_ERRORS = (ImportError, RuntimeError, ValueError, OSError)
 
 
 def _create_ml_facade(settings):
@@ -49,7 +51,7 @@ def _create_ml_facade(settings):
     try:
         from ml import MLFacade
         return MLFacade.from_settings(settings)
-    except Exception as e:
+    except HANDLED_ML_INIT_ERRORS as e:
         # Log error pero no fallar - ML es opcional
         print(f"[WARN] No se pudo inicializar ML: {e}")
         return None
@@ -61,7 +63,6 @@ def create_app() -> FastAPI:
 
     rag_repo = RagRepositoryPG(settings)
     audit_logger = AuditLoggerPG(settings)
-    insight_reader = InsightReaderPG(settings)
     ingest_rag = IngestRag(rag_repo)
 
     feature_repo = FeatureRepositoryPG(settings)
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     llm_client = build_llm_client(settings)
     insight_planner = InsightPlannerLLM(llm_client)
     copilot_explainer = CopilotExplainerLLM(llm_client)
+    metrics_adapter = MetricsAdapter()
     ml_facade = _create_ml_facade(settings)
 
     model_runner = AnomalyRunner(
@@ -105,6 +107,7 @@ def create_app() -> FastAPI:
         llm_model=settings.llm_model,
         ml_detector=ml_facade,
         ml_shadow_mode=settings.ml_shadow_mode,
+        metrics=metrics_adapter,
     )
     explain_insight = ExplainInsight(
         insight_repo=insight_repo,
