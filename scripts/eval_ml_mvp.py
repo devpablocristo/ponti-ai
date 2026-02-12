@@ -13,10 +13,10 @@ DEFAULT_ROOT = Path(__file__).parent.parent
 ROOT_DIR = Path("/app") if Path("/app").exists() else DEFAULT_ROOT
 sys.path.insert(0, str(ROOT_DIR))
 
-from app.config import load_settings
-from ml import MLFacade
-from ml.application.use_cases.predict_anomaly import PredictAnomalyUseCase
-from ml.domain.entities import Dataset
+from app.config import load_settings  # noqa: E402
+from contexts.ml import MLFacade  # noqa: E402
+from contexts.ml.application.use_cases.predict_anomaly import PredictAnomalyUseCase  # noqa: E402
+from contexts.ml.domain.entities import Dataset  # noqa: E402
 
 try:
     import psycopg

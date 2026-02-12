@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
-from application.insights.ports.baseline_computer import BaselineComputerPort, CohortConfig
-from application.insights.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
-from application.insights.ports.job_lock import JobLockPort
-from application.insights.ports.project_repository import ProjectRepositoryPort
-from application.insights.use_cases.recompute_baselines import RecomputeBaselines
+from contexts.insights.application.ports.baseline_computer import BaselineComputerPort, CohortConfig
+from contexts.insights.application.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
+from contexts.insights.application.ports.job_lock import JobLockPort
+from contexts.insights.application.ports.project_repository import ProjectRepositoryPort
+from contexts.insights.application.use_cases.recompute_baselines import RecomputeBaselines
 from adapters.outbound.models.anomaly_runner import AnomalyRunner
-from application.insights.ports.feature_repository import FeatureValue
+from contexts.insights.application.ports.feature_repository import FeatureValue
 
 
 class FakeBaselineRepo(BaselineRepositoryPort):

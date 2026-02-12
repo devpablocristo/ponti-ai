@@ -1,7 +1,7 @@
 from adapters.outbound.sql.baseline_catalog import PROJECT_LIST_SQL
 from adapters.outbound.sql.executor import SQLExecutor
 from app.config import Settings
-from application.insights.ports.project_repository import ProjectRepositoryPort
+from contexts.insights.application.ports.project_repository import ProjectRepositoryPort
 
 
 class ProjectRepositoryPG(ProjectRepositoryPort):

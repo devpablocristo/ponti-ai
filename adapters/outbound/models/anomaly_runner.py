@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from application.insights.ports.baseline_repository import BaselineRepositoryPort
-from application.insights.ports.feature_repository import FeatureValue
-from domain.insights.entities import Insight
+from contexts.insights.application.ports.baseline_repository import BaselineRepositoryPort
+from contexts.insights.application.ports.feature_repository import FeatureValue
+from contexts.insights.domain.entities import Insight
 
 
 class AnomalyRunner:

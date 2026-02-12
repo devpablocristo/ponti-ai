@@ -9,8 +9,8 @@ from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_SYSTEM_PROMPT,
     COPILOT_EXPLAIN_USER_PROMPT_TEMPLATE,
 )
-from application.copilot.ports.copilot_explainer import CopilotExplainerPort, CopilotExplainMode
-from domain.insights.entities import Insight
+from contexts.copilot.application.ports.copilot_explainer import CopilotExplainerPort, CopilotExplainMode
+from contexts.insights.domain.entities import Insight
 
 
 class _ExplainOut(BaseModel):

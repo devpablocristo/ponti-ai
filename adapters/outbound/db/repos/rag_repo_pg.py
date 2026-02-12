@@ -1,7 +1,7 @@
 from adapters.outbound.rag.ingest import ingest_documents
 from adapters.outbound.rag.search import search_documents
 from app.config import Settings
-from domain.copilot.entities import RagSearchResult
+from contexts.copilot.domain.entities import RagSearchResult
 
 
 class RagRepositoryPG:

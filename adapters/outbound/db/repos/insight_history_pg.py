@@ -1,6 +1,6 @@
 from adapters.outbound.db.session import DBSession
 from app.config import Settings
-from application.insights.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
+from contexts.insights.application.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
 
 
 class InsightHistoryPG(InsightHistoryPort):

@@ -3,7 +3,7 @@ import uuid
 
 from adapters.outbound.db.session import DBSession
 from app.config import Settings
-from application.insights.ports.proposal_store import ProposalStatus, ProposalStorePort, StoredProposal
+from contexts.insights.application.ports.proposal_store import ProposalStatus, ProposalStorePort, StoredProposal
 
 
 def _row_to_proposal(row: dict) -> StoredProposal:

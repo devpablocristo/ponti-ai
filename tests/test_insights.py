@@ -2,19 +2,19 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from application.insights.ports.feature_repository import FeatureRepositoryPort, FeatureValue
-from application.insights.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
-from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
-from application.insights.ports.insight_planner import InsightPlannerPort
-from application.insights.ports.ml_detector import MLDetectorPort
-from application.insights.ports.model_runner import ModelRunnerPort
-from application.insights.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
-from application.insights.ports.proposal_store import ProposalStorePort, StoredProposal
-from application.insights.use_cases.compute_insights import ComputeInsights
-from application.insights.use_cases.get_summary import GetSummary
-from application.insights.use_cases.record_action import RecordAction
-from application.copilot.ports.audit_logger import AuditLoggerPort, AuditRecord
-from domain.insights.entities import Insight
+from contexts.insights.application.ports.feature_repository import FeatureRepositoryPort, FeatureValue
+from contexts.insights.application.ports.insight_history import InsightActionItem, InsightHistoryItem, InsightHistoryPort
+from contexts.insights.application.ports.insight_repository import InsightRepositoryPort, InsightSummary
+from contexts.insights.application.ports.insight_planner import InsightPlannerPort
+from contexts.insights.application.ports.ml_detector import MLDetectorPort
+from contexts.insights.application.ports.model_runner import ModelRunnerPort
+from contexts.insights.application.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
+from contexts.insights.application.ports.proposal_store import ProposalStorePort, StoredProposal
+from contexts.insights.application.use_cases.compute_insights import ComputeInsights
+from contexts.insights.application.use_cases.get_summary import GetSummary
+from contexts.insights.application.use_cases.record_action import RecordAction
+from contexts.copilot.application.ports.audit_logger import AuditLoggerPort, AuditRecord
+from contexts.insights.domain.entities import Insight
 
 
 class FakeFeatureRepo(FeatureRepositoryPort):

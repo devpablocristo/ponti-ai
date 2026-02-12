@@ -75,7 +75,7 @@ services:
       - INSIGHTS_RECOMPUTE_STALE_LOCK_SECONDS=300
       - ML_ENABLED=true
       - ML_MODEL_TYPE=isolation_forest
-      - ML_MODELS_DIR=/app/ml_models
+      - ML_MODELS_DIR=/app/contexts/ml_models
       - ML_IF_CONTAMINATION=0.05
       - ML_IF_N_ESTIMATORS=100
       - ML_IF_RANDOM_STATE=42
@@ -88,7 +88,7 @@ services:
       - ML_PROMOTION_MIN_ALERT_RATE_IMPROVEMENT=0.01
       - ML_PROMOTION_MIN_SAMPLES_RATIO=0.8
     volumes:
-      - ai-ml-models:/app/ml_models
+      - ai-ml-models:/app/contexts/ml_models
     ports:
       - "8090:8090"
     extra_hosts:

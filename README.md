@@ -59,7 +59,7 @@ El servicio combina insights de reglas con insights de ML cuando hay un modelo a
 Variables clave:
 - `ML_ENABLED=true`
 - `ML_MODEL_TYPE=isolation_forest`
-- `ML_MODELS_DIR=ml_models` (local) o `/app/ml_models` (docker)
+- `ML_MODELS_DIR=ml_models` (local) o `/app/contexts/ml_models` (docker)
 - `ML_ROLLOUT_PERCENT=100` (0-100, gating gradual por proyecto)
 - `ML_ENABLED_PROJECT_IDS=` (lista CSV opcional para allowlist estricta)
 - `ML_SHADOW_MODE=false` (si `true`, persiste insights ML como `status=shadow` y no aparecen en listados de usuario)
@@ -246,8 +246,9 @@ FE (UI)
 ```
 
 ## Arquitectura (hexagonal liviana)
-- `domain/`: entidades y value objects
-- `application/`: use cases + ports
+- `contexts/insights/domain` + `contexts/copilot/domain`: entidades del negocio
+- `contexts/*/application`: use cases + ports por contexto
+- `contexts/ml`: bounded context de ML
 - `adapters/inbound/`: API (FastAPI) + schemas + auth
 - `adapters/outbound/`: DB, SQL, RAG, modelos, observabilidad
 - `app/main.py`: wiring manual (sin DI framework)

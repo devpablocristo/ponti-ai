@@ -2,9 +2,9 @@ import json
 import uuid
 
 from adapters.outbound.db.session import DBSession
-from application.insights.ports.insight_repository import InsightRepositoryPort, InsightSummary
+from contexts.insights.application.ports.insight_repository import InsightRepositoryPort, InsightSummary
 from app.config import Settings
-from domain.insights.entities import Insight
+from contexts.insights.domain.entities import Insight
 
 
 def _row_to_insight(row: dict) -> Insight:

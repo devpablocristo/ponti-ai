@@ -42,7 +42,7 @@ class FakeMLFacade:
         return {
             "enabled": True,
             "model_type": "isolation_forest",
-            "models_dir": "/app/ml_models",
+            "models_dir": "/app/contexts/ml_models",
             "has_active_model": True,
             "active_version": "v1",
             "available_versions": ["v1"],

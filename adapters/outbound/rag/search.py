@@ -3,7 +3,7 @@ from pgvector.psycopg import register_vector
 from adapters.outbound.db.session import DBSession
 from adapters.outbound.rag.embeddings import embed_texts
 from app.config import Settings
-from domain.copilot.entities import RagSearchResult
+from contexts.copilot.domain.entities import RagSearchResult
 
 
 def search_documents(settings: Settings, project_id: str, question: str) -> RagSearchResult:

@@ -1,4 +1,4 @@
-from application.insights.ports.metrics import MetricsPort
+from contexts.insights.application.ports.metrics import MetricsPort
 
 from adapters.outbound.observability.metrics import inc_counter
 

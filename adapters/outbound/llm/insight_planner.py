@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from adapters.outbound.llm.client import LLMClient
 from adapters.outbound.llm.prompts import INSIGHT_PLANNER_PROMPT_VERSION, INSIGHT_PLANNER_SYSTEM_PROMPT, INSIGHT_PLANNER_USER_PROMPT_TEMPLATE
 from adapters.outbound.tools.catalog import TOOLS_CATALOG_VERSION, list_tools_as_json, validate_tool_args
-from application.insights.ports.insight_planner import InsightPlannerPort
-from domain.insights.entities import Insight
+from contexts.insights.application.ports.insight_planner import InsightPlannerPort
+from contexts.insights.domain.entities import Insight
 
 
 class _Classification(BaseModel):

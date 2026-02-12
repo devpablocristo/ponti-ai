@@ -41,15 +41,15 @@ Migraciones relevantes:
 - `adapters/inbound/api/auth/headers.py`
 
 ### 3.3 Application
-- `application/*/use_cases/*.py`
-- `application/*/ports/*.py` (interfaces tipo Go con `Protocol`)
+- `contexts/*/application/use_cases/*.py`
+- `contexts/*/application/ports/*.py` (interfaces tipo Go con `Protocol`)
 
 ### 3.4 Domain
-- `domain/*/entities.py` (dataclasses inmutables)
+- `contexts/*/domain/entities.py` (dataclasses inmutables)
 
 ### 3.5 Bounded context ML
-- `ml/` con su propia mini-hexagonal
-- `ml/facade.py` expone `train()` y `detect_anomalies()`
+- `contexts/ml/` con su propia mini-hexagonal
+- `contexts/ml/facade.py` expone `train()` y `detect_anomalies()`
 
 ## 4) Seguridad de entrada
 Headers obligatorios en endpoints de negocio:
@@ -105,7 +105,7 @@ Router: `adapters/inbound/api/routes/insights.py`.
 6. planner LLM por insight (gating)
 7. audit log final
 
-Archivo: `application/insights/use_cases/compute_insights.py`.
+Archivo: `contexts/insights/application/use_cases/compute_insights.py`.
 
 ### Paso 3: Feature extraction
 `FeatureRepositoryPG.fetch_features()`:
@@ -143,9 +143,9 @@ Archivo: `adapters/outbound/models/anomaly_runner.py`.
 - si `ML_SHADOW_MODE=true`, persiste insight ML como `status=shadow`
 
 Archivos:
-- `ml/facade.py`
-- `ml/application/use_cases/predict_anomaly.py`
-- `ml/adapters/training/filesystem_model_store.py`
+- `contexts/ml/facade.py`
+- `contexts/ml/application/use_cases/predict_anomaly.py`
+- `contexts/ml/adapters/training/filesystem_model_store.py`
 
 ### Paso 6: Dedupe/cooldown
 Antes de persistir, `ComputeInsights` descarta insights que:
@@ -174,7 +174,7 @@ Proceso:
 - fail-open si LLM falla
 
 Archivos:
-- `application/insights/use_cases/compute_insights.py`
+- `contexts/insights/application/use_cases/compute_insights.py`
 - `adapters/outbound/llm/insight_planner.py`
 - `adapters/outbound/tools/catalog.py`
 - `adapters/outbound/db/repos/proposal_store_pg.py`
@@ -204,7 +204,7 @@ Internamente tambien computa:
 - retorna `explanation + proposal`
 
 Archivos:
-- `application/copilot/use_cases/explain_insight.py`
+- `contexts/copilot/application/use_cases/explain_insight.py`
 - `adapters/outbound/llm/copilot_explainer.py`
 
 ### 7.2 Nota
@@ -234,14 +234,14 @@ Copilot v2 no expone chat libre: la capa de explainability funciona por `insight
 - si entrena, aplica policy de promotion automaticamente
 
 Archivos:
-- `application/insights/use_cases/recompute_active.py`
-- `application/insights/use_cases/recompute_baselines.py`
+- `contexts/insights/application/use_cases/recompute_active.py`
+- `contexts/insights/application/use_cases/recompute_baselines.py`
 - `adapters/outbound/db/job_lock_pg.py`
 - `adapters/inbound/api/routes/jobs.py`
 
 ## 9) Operacion ML (actual)
 ### Entrenamiento
-- comando: `python -m ml.scripts.train --activate`
+- comando: `python -m contexts.ml.scripts.train --activate`
 - en Makefile: `make train-ml`
 - persiste artefactos en `ML_MODELS_DIR`
 

@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from adapters.outbound.sql.baseline_catalog import list_cohort_queries, list_project_queries
 from adapters.outbound.sql.executor import SQLExecutor
 from app.config import Settings
-from application.insights.ports.baseline_computer import BaselineComputerPort, CohortConfig
-from application.insights.ports.baseline_repository import BaselineRecord
+from contexts.insights.application.ports.baseline_computer import BaselineComputerPort, CohortConfig
+from contexts.insights.application.ports.baseline_repository import BaselineRecord
 
 
 class BaselineComputerPG(BaselineComputerPort):

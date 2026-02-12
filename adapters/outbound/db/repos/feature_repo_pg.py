@@ -1,6 +1,6 @@
 from adapters.outbound.sql.catalog import list_feature_entries
 from adapters.outbound.sql.executor import SQLExecutor
-from application.insights.ports.feature_repository import FeatureRepositoryPort, FeatureValue
+from contexts.insights.application.ports.feature_repository import FeatureRepositoryPort, FeatureValue
 from app.config import Settings
 
 

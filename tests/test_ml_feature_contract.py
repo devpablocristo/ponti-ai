@@ -4,11 +4,11 @@ import pytest
 
 pytest.importorskip("joblib")
 
-from ml.adapters.training.postgres_data_loader import PostgresDataLoader
-from ml.config import load_ml_config
-from ml.facade import MLFacade
-from ml.domain.entities import ModelInfo
-from application.insights.ports.feature_repository import FeatureValue
+from contexts.ml.adapters.training.postgres_data_loader import PostgresDataLoader
+from contexts.ml.config import load_ml_config
+from contexts.ml.facade import MLFacade
+from contexts.ml.domain.entities import ModelInfo
+from contexts.insights.application.ports.feature_repository import FeatureValue
 
 
 def _contract(config) -> list[str]:

@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from application.insights.ports.baseline_computer import CohortConfig
+from contexts.insights.application.ports.baseline_computer import CohortConfig
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from adapters.outbound.db.session import DBSession
 from app.config import Settings
-from application.insights.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
+from contexts.insights.application.ports.baseline_repository import BaselineRecord, BaselineRepositoryPort
 
 
 def _stable_id(record: BaselineRecord) -> str:

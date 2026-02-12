@@ -5,7 +5,7 @@ import pytest
 
 from adapters.outbound.llm.client import LLMCompletion, LLMError, OllamaChatClient
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
-from domain.insights.entities import Insight
+from contexts.insights.domain.entities import Insight
 
 
 class _FailingLLM:

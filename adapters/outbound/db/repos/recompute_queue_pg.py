@@ -1,6 +1,6 @@
 from adapters.outbound.db.session import DBSession
 from app.config import Settings
-from application.insights.ports.recompute_queue import RecomputeQueueItem, RecomputeQueuePort
+from contexts.insights.application.ports.recompute_queue import RecomputeQueueItem, RecomputeQueuePort
 
 
 class RecomputeQueuePG(RecomputeQueuePort):

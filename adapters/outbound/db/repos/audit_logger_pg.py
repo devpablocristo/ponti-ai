@@ -1,7 +1,7 @@
 import json
 
 from adapters.outbound.db.session import DBSession
-from application.copilot.ports.audit_logger import AuditRecord
+from contexts.copilot.application.ports.audit_logger import AuditRecord
 from app.config import Settings
 
 

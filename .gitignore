@@ -112,6 +112,9 @@ yarn-error.log*
 *.pyo
 *.pyc
 *.pyd
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 
 # Node.js
 .npm/

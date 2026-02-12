@@ -24,16 +24,16 @@ from adapters.outbound.observability.metrics_adapter import MetricsAdapter
 from adapters.outbound.sql.baseline_computer_pg import BaselineComputerPG
 from adapters.outbound.sql.project_repo_pg import ProjectRepositoryPG
 from app.config import load_settings
-from application.copilot.use_cases.explain_insight import ExplainInsight
-from application.copilot.use_cases.ingest_rag import IngestRag
-from application.insights.use_cases.compute_insights import ComputeInsights
-from application.insights.use_cases.get_insights import GetInsights
-from application.insights.use_cases.get_summary import GetSummary
-from application.insights.use_cases.record_action import RecordAction
-from application.insights.use_cases.recompute_active import RecomputeActive
-from application.insights.use_cases.recompute_baselines import RecomputeBaselines
-from application.insights.use_cases.process_recompute_queue import ProcessRecomputeQueue
-from application.insights.use_cases.queue_recompute_event import QueueRecomputeEvent
+from contexts.copilot.application.use_cases.explain_insight import ExplainInsight
+from contexts.copilot.application.use_cases.ingest_rag import IngestRag
+from contexts.insights.application.use_cases.compute_insights import ComputeInsights
+from contexts.insights.application.use_cases.get_insights import GetInsights
+from contexts.insights.application.use_cases.get_summary import GetSummary
+from contexts.insights.application.use_cases.record_action import RecordAction
+from contexts.insights.application.use_cases.recompute_active import RecomputeActive
+from contexts.insights.application.use_cases.recompute_baselines import RecomputeBaselines
+from contexts.insights.application.use_cases.process_recompute_queue import ProcessRecomputeQueue
+from contexts.insights.application.use_cases.queue_recompute_event import QueueRecomputeEvent
 
 HANDLED_ML_INIT_ERRORS = (ImportError, RuntimeError, ValueError, OSError)
 
@@ -49,7 +49,7 @@ def _create_ml_facade(settings):
         return None
 
     try:
-        from ml import MLFacade
+        from contexts.ml import MLFacade
         return MLFacade.from_settings(settings)
     except HANDLED_ML_INIT_ERRORS as e:
         # Log error pero no fallar - ML es opcional
