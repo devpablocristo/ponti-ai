@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from adapters.inbound.api.dependencies import AppContainer
@@ -24,7 +23,6 @@ from contexts.insights.application.use_cases.record_action import RecordAction
 
 
 def create_app() -> FastAPI:
-    load_dotenv()
     settings = load_settings()
 
     audit_logger = AuditLoggerPG(settings)
