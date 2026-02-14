@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from typing import Any
 
 from contexts.copilot.application.ports.copilot_explainer import CopilotExplainMode, CopilotExplainerPort
@@ -25,7 +26,9 @@ class ExplainInsight:
         proposal_row = self.proposal_store.get_latest_ok(insight_id)
         proposal = proposal_row.proposal if proposal_row else None
 
-        explanation = self.explainer.explain(insight=insight, proposal=proposal, mode=mode)
+        request_scope = self._explainer_request_scope()
+        with request_scope:
+            explanation = self.explainer.explain(insight=insight, proposal=proposal, mode=mode)
         return {
             "insight_id": insight.id,
             "mode": mode,
@@ -33,3 +36,8 @@ class ExplainInsight:
             "proposal": proposal,
         }
 
+    def _explainer_request_scope(self):
+        request_scope = getattr(self.explainer, "request_scope", None)
+        if callable(request_scope):
+            return request_scope()
+        return nullcontext()

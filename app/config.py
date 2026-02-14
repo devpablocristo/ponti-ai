@@ -1,78 +1,36 @@
 import os
 from dataclasses import dataclass
 
-from contexts.insights.application.ports.baseline_computer import CohortConfig
-
 
 @dataclass(frozen=True)
 class Settings:
-    # Config general
     app_name: str
     env: str
-
-    # DB
     db_dsn: str
-
-    # Seguridad y limites
     statement_timeout_ms: int
     max_limit: int
     default_limit: int
-
-    # RAG
-    embedding_dim: int
-    rag_top_k: int
-
-    # LLM
     llm_provider: str
     llm_model: str
     llm_api_key: str | None
     llm_base_url: str | None
-    llm_timeout_s: float
+    llm_timeout_ms: int
     llm_max_retries: int
-
-    # Insights
+    llm_max_output_tokens: int
+    llm_max_calls_per_request: int
+    llm_budget_tokens_per_request: int
+    llm_rate_limit_rps: float
+    copilot_enabled: bool
     insights_ratio_high: float
     insights_ratio_medium: float
     insights_spike_ratio: float
     insights_cooldown_days: int
     insights_impact_k: float
     insights_impact_cap: float
-
-    # Baselines y jobs
     insights_size_small_max: float
     insights_size_medium_max: float
-    insights_project_baseline_days: int
-    insights_min_samples_project: int
-    insights_baseline_lock_key: int
-    insights_recompute_lock_key: int
-    insights_baseline_batch_size: int
-    insights_recompute_debounce_seconds: int
-    insights_recompute_queue_batch_size: int
-    insights_recompute_queue_workers: int
-    insights_recompute_stale_lock_seconds: int
-
-    # Planner v2 (LLM)
     domain: str
     max_actions_allowed: int
-
-    # ML (Machine Learning)
-    ml_enabled: bool
-    ml_model_type: str
-    ml_retrain_lock_key: int
-    ml_rollout_percent: int
-    ml_enabled_project_ids: tuple[str, ...]
-    ml_shadow_mode: bool
-    ml_auto_promote: bool
-    ml_auto_retrain_min_hours: int
-    ml_promotion_min_alert_rate_improvement: float
-    ml_promotion_min_samples_ratio: float
-
-    @property
-    def cohort_config(self) -> CohortConfig:
-        return CohortConfig(
-            size_small_max=self.insights_size_small_max,
-            size_medium_max=self.insights_size_medium_max,
-        )
 
 
 def _get_required(name: str) -> str:
@@ -108,13 +66,6 @@ def _get_optional_int(name: str, default: int) -> int:
         raise ValueError(f"{name} debe ser numerico") from exc
 
 
-def _get_optional_csv(name: str, default: str = "") -> tuple[str, ...]:
-    raw = _get_optional(name, default)
-    if raw is None:
-        return tuple()
-    return tuple(item.strip() for item in raw.split(",") if item.strip())
-
-
 def _get_required_float(name: str) -> float:
     raw = _get_required(name)
     try:
@@ -131,6 +82,18 @@ def _get_optional_float(name: str, default: float) -> float:
         return float(raw)
     except ValueError as exc:
         raise ValueError(f"{name} debe ser numerico") from exc
+
+
+def _get_optional_bool(name: str, default: bool) -> bool:
+    raw = _get_optional(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} debe ser booleano")
 
 
 def load_settings() -> Settings:
@@ -151,14 +114,17 @@ def load_settings() -> Settings:
         statement_timeout_ms=_get_required_int("STATEMENT_TIMEOUT_MS"),
         max_limit=_get_required_int("MAX_LIMIT"),
         default_limit=_get_required_int("DEFAULT_LIMIT"),
-        embedding_dim=_get_required_int("EMBEDDING_DIM"),
-        rag_top_k=_get_required_int("RAG_TOP_K"),
         llm_provider=llm_provider,
         llm_model=_get_optional("LLM_MODEL", default_model) or default_model,
         llm_api_key=_get_optional("LLM_API_KEY"),
         llm_base_url=_get_optional("LLM_BASE_URL"),
-        llm_timeout_s=_get_optional_float("LLM_TIMEOUT_S", 20.0),
-        llm_max_retries=_get_optional_int("LLM_MAX_RETRIES", 3),
+        llm_timeout_ms=max(1, _get_optional_int("LLM_TIMEOUT_MS", 5000)),
+        llm_max_retries=max(1, _get_optional_int("LLM_MAX_RETRIES", 3)),
+        llm_max_output_tokens=max(1, _get_optional_int("LLM_MAX_OUTPUT_TOKENS", 700)),
+        llm_max_calls_per_request=max(1, _get_optional_int("LLM_MAX_CALLS_PER_REQUEST", 3)),
+        llm_budget_tokens_per_request=max(1, _get_optional_int("LLM_BUDGET_TOKENS_PER_REQUEST", 2500)),
+        llm_rate_limit_rps=max(0.1, _get_optional_float("LLM_RATE_LIMIT_RPS", 2.0)),
+        copilot_enabled=_get_optional_bool("COPILOT_ENABLED", True),
         insights_ratio_high=_get_required_float("INSIGHTS_RATIO_HIGH"),
         insights_ratio_medium=_get_required_float("INSIGHTS_RATIO_MEDIUM"),
         insights_spike_ratio=_get_required_float("INSIGHTS_SPIKE_RATIO"),
@@ -167,25 +133,6 @@ def load_settings() -> Settings:
         insights_impact_cap=_get_required_float("INSIGHTS_IMPACT_CAP"),
         insights_size_small_max=_get_required_float("INSIGHTS_SIZE_SMALL_MAX"),
         insights_size_medium_max=_get_required_float("INSIGHTS_SIZE_MEDIUM_MAX"),
-        insights_project_baseline_days=_get_required_int("INSIGHTS_PROJECT_BASELINE_DAYS"),
-        insights_min_samples_project=_get_required_int("INSIGHTS_MIN_SAMPLES_PROJECT"),
-        insights_baseline_lock_key=_get_required_int("INSIGHTS_BASELINE_LOCK_KEY"),
-        insights_recompute_lock_key=_get_required_int("INSIGHTS_RECOMPUTE_LOCK_KEY"),
-        insights_baseline_batch_size=_get_required_int("INSIGHTS_BASELINE_BATCH_SIZE"),
-        insights_recompute_debounce_seconds=max(0, _get_optional_int("INSIGHTS_RECOMPUTE_DEBOUNCE_SECONDS", 120)),
-        insights_recompute_queue_batch_size=max(1, _get_optional_int("INSIGHTS_RECOMPUTE_QUEUE_BATCH_SIZE", 50)),
-        insights_recompute_queue_workers=max(1, _get_optional_int("INSIGHTS_RECOMPUTE_QUEUE_WORKERS", 4)),
-        insights_recompute_stale_lock_seconds=max(30, _get_optional_int("INSIGHTS_RECOMPUTE_STALE_LOCK_SECONDS", 300)),
         domain=_get_optional("DOMAIN", "agriculture") or "agriculture",
-        max_actions_allowed=_get_optional_int("MAX_ACTIONS_ALLOWED", 4),
-        ml_enabled=_get_optional("ML_ENABLED", "false") == "true",
-        ml_model_type=_get_optional("ML_MODEL_TYPE", "isolation_forest") or "isolation_forest",
-        ml_retrain_lock_key=_get_optional_int("ML_RETRAIN_LOCK_KEY", 41003),
-        ml_rollout_percent=max(0, min(100, _get_optional_int("ML_ROLLOUT_PERCENT", 100))),
-        ml_enabled_project_ids=_get_optional_csv("ML_ENABLED_PROJECT_IDS", ""),
-        ml_shadow_mode=_get_optional("ML_SHADOW_MODE", "false") == "true",
-        ml_auto_promote=_get_optional("ML_AUTO_PROMOTE", "true") == "true",
-        ml_auto_retrain_min_hours=max(1, _get_optional_int("ML_AUTO_RETRAIN_MIN_HOURS", 24)),
-        ml_promotion_min_alert_rate_improvement=max(0.0, _get_optional_float("ML_PROMOTION_MIN_ALERT_RATE_IMPROVEMENT", 0.01)),
-        ml_promotion_min_samples_ratio=max(0.0, _get_optional_float("ML_PROMOTION_MIN_SAMPLES_RATIO", 0.8)),
+        max_actions_allowed=max(0, _get_optional_int("MAX_ACTIONS_ALLOWED", 4)),
     )

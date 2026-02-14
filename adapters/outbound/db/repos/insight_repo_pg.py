@@ -232,19 +232,6 @@ class InsightRepositoryPG(InsightRepositoryPort):
                 )
             conn.commit()
 
-    def mark_recomputed(self, project_id: str) -> None:
-        with self.session.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE ai_insights
-                    SET computed_at = NOW()
-                    WHERE project_id = %(project_id)s
-                    """,
-                    {"project_id": project_id},
-                )
-            conn.commit()
-
     def get_active_by_dedupe(
         self,
         project_id: str,
@@ -278,36 +265,3 @@ class InsightRepositoryPG(InsightRepositoryPort):
         if not row:
             return None
         return _row_to_insight(dict(row))
-
-    def count_active(self, project_id: str) -> int:
-        with self.session.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM ai_insights
-                    WHERE project_id = %(project_id)s
-                      AND status = 'new'
-                      AND valid_until >= NOW()
-                    """,
-                    {"project_id": project_id},
-                )
-                return int(cur.fetchone()["total"])
-
-    def list_active(self, project_id: str, limit: int) -> list[Insight]:
-        with self.session.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT *
-                    FROM ai_insights
-                    WHERE project_id = %(project_id)s
-                      AND status = 'new'
-                      AND valid_until >= NOW()
-                    ORDER BY severity DESC, computed_at DESC
-                    LIMIT %(limit)s
-                    """,
-                    {"project_id": project_id, "limit": limit},
-                )
-                rows = cur.fetchall()
-        return [_row_to_insight(dict(row)) for row in rows]

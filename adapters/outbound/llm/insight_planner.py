@@ -61,6 +61,11 @@ class InsightPlannerLLM(InsightPlannerPort):
     def __init__(self, llm: LLMClient) -> None:
         self.llm = llm
 
+    def request_scope(self):
+        if hasattr(self.llm, "request_scope"):
+            return self.llm.request_scope()
+        raise RuntimeError("llm_request_scope_unavailable")
+
     def plan(
         self,
         *,

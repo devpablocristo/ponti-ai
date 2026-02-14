@@ -59,39 +59,6 @@ _TOOLS: list[ToolSpec] = [
             },
         },
     ),
-    ToolSpec(
-        name="recompute_baselines",
-        description="Dispara la recomputación de baselines para un proyecto y/o cohorte.",
-        args_schema={
-            "type": "object",
-            "additionalProperties": True,
-            "required": ["project_id"],
-            "properties": {
-                "project_id": {"type": "string"},
-                "cohort_key": {"type": "string"},
-                "features": {"type": "array"},
-                "time_windows": {"type": "array"},
-                "reason": {"type": "string"},
-                "priority": {"type": "string"},
-            },
-        },
-    ),
-    ToolSpec(
-        name="recompute_insights",
-        description="Recalcula insights para una entidad luego de cambios en datos o baselines.",
-        args_schema={
-            "type": "object",
-            "additionalProperties": True,
-            "required": ["project_id", "entity_type", "entity_id"],
-            "properties": {
-                "project_id": {"type": "string"},
-                "entity_type": {"type": "string"},
-                "entity_id": {"type": "string"},
-                "reason": {"type": "string"},
-                "priority": {"type": "string"},
-            },
-        },
-    ),
 ]
 
 

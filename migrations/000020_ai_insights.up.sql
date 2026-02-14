@@ -28,15 +28,6 @@ CREATE TABLE IF NOT EXISTS ai_insight_actions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ai_entity_scores (
-    id UUID PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    entity_id TEXT NOT NULL,
-    score FLOAT NOT NULL,
-    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE INDEX IF NOT EXISTS idx_ai_insights_project_status_valid
     ON ai_insights (project_id, status, valid_until);
 

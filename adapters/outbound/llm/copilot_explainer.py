@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from adapters.outbound.llm.client import LLMClient, LLMError
+from adapters.outbound.llm.client import LLMBudgetExceededError, LLMClient, LLMError, LLMRateLimitError
 from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_PROMPT_VERSION,
     COPILOT_EXPLAIN_SYSTEM_PROMPT,
@@ -45,8 +45,15 @@ class CopilotExplainerLLM(CopilotExplainerPort):
             payload = json.loads(completion.content)
             out = _ExplainOut.model_validate(payload)
             return out.model_dump()
+        except (LLMRateLimitError, LLMBudgetExceededError):
+            raise
         except (LLMError, json.JSONDecodeError, ValueError):
             return _fallback_explanation(insight=insight, mode=mode)
+
+    def request_scope(self):
+        if hasattr(self.llm, "request_scope"):
+            return self.llm.request_scope()
+        raise RuntimeError("llm_request_scope_unavailable")
 
 
 def _insight_to_prompt_dict(insight: Insight) -> dict[str, Any]:

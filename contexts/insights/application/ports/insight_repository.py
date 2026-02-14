@@ -27,9 +27,6 @@ class InsightRepositoryPort(Protocol):
     def record_action(self, insight_id: str, project_id: str, user_id: str, action: str, new_status: str) -> None:
         ...
 
-    def mark_recomputed(self, project_id: str) -> None:
-        ...
-
     def get_active_by_dedupe(
         self,
         project_id: str,
@@ -37,10 +34,4 @@ class InsightRepositoryPort(Protocol):
         entity_id: str,
         dedupe_key: str,
     ) -> Insight | None:
-        ...
-
-    def count_active(self, project_id: str) -> int:
-        ...
-
-    def list_active(self, project_id: str, limit: int) -> list[Insight]:
         ...

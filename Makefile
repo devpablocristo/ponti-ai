@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UVICORN_PORT ?= 8090
 COMPOSE ?= docker compose
 
-.PHONY: install up down build migrate run test train-ml pull-ollama-models smoke smoke-local eval-ml eval-ml-local benchmark-k6
+.PHONY: install up down build migrate run test pull-ollama-models smoke smoke-local
 
 install:
 	python -m pip install -r requirements.txt
@@ -28,12 +28,8 @@ run:
 test:
 	PYTHONPATH=. python -m pytest
 
-train-ml:
-	$(COMPOSE) run --rm ai-copilot python -m contexts.ml.scripts.train --activate
-
 pull-ollama-models:
 	$(COMPOSE) exec ollama ollama pull llama3.1
-	$(COMPOSE) exec ollama ollama pull nomic-embed-text
 
 smoke:
 	$(COMPOSE) cp scripts/smoke_endpoints.py ai-copilot:/tmp/smoke_endpoints.py
@@ -41,14 +37,3 @@ smoke:
 
 smoke-local:
 	python scripts/smoke_endpoints.py
-
-eval-ml:
-	$(COMPOSE) cp scripts/eval_ml_mvp.py ai-copilot:/tmp/eval_ml_mvp.py
-	$(COMPOSE) exec -T ai-copilot python /tmp/eval_ml_mvp.py $(EVAL_ML_ARGS)
-
-eval-ml-local:
-	python scripts/eval_ml_mvp.py $(EVAL_ML_ARGS)
-
-benchmark-k6:
-	chmod +x scripts/benchmark_k6.sh
-	scripts/benchmark_k6.sh

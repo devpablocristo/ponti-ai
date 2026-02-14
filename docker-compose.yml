@@ -1,6 +1,6 @@
 services:
   ai-db:
-    image: pgvector/pgvector:pg16
+    image: postgres:16-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -47,15 +47,16 @@ services:
       - STATEMENT_TIMEOUT_MS=20000
       - MAX_LIMIT=200
       - DEFAULT_LIMIT=50
-      - EMBEDDING_DIM=1536
-      - RAG_TOP_K=5
+      - COPILOT_ENABLED=true
       - LLM_PROVIDER=ollama
       - LLM_BASE_URL=http://ollama:11434
       - LLM_MODEL=llama3.1
-      - LLM_TIMEOUT_S=20
+      - LLM_TIMEOUT_MS=5000
       - LLM_MAX_RETRIES=1
-      - EMBEDDING_PROVIDER=ollama
-      - EMBEDDING_MODEL=nomic-embed-text
+      - LLM_MAX_OUTPUT_TOKENS=700
+      - LLM_MAX_CALLS_PER_REQUEST=3
+      - LLM_BUDGET_TOKENS_PER_REQUEST=2500
+      - LLM_RATE_LIMIT_RPS=2.0
       - INSIGHTS_RATIO_HIGH=0.5
       - INSIGHTS_RATIO_MEDIUM=0.2
       - INSIGHTS_SPIKE_RATIO=1.5
@@ -64,31 +65,8 @@ services:
       - INSIGHTS_IMPACT_CAP=2.0
       - INSIGHTS_SIZE_SMALL_MAX=200
       - INSIGHTS_SIZE_MEDIUM_MAX=1000
-      - INSIGHTS_PROJECT_BASELINE_DAYS=365
-      - INSIGHTS_MIN_SAMPLES_PROJECT=10
-      - INSIGHTS_BASELINE_LOCK_KEY=41001
-      - INSIGHTS_RECOMPUTE_LOCK_KEY=41002
-      - INSIGHTS_BASELINE_BATCH_SIZE=200
-      - INSIGHTS_RECOMPUTE_DEBOUNCE_SECONDS=120
-      - INSIGHTS_RECOMPUTE_QUEUE_BATCH_SIZE=50
-      - INSIGHTS_RECOMPUTE_QUEUE_WORKERS=4
-      - INSIGHTS_RECOMPUTE_STALE_LOCK_SECONDS=300
-      - ML_ENABLED=true
-      - ML_MODEL_TYPE=isolation_forest
-      - ML_MODELS_DIR=/app/contexts/ml_models
-      - ML_IF_CONTAMINATION=0.05
-      - ML_IF_N_ESTIMATORS=100
-      - ML_IF_RANDOM_STATE=42
-      - ML_ANOMALY_THRESHOLD=0.6
-      - ML_SEVERITY_HIGH=0.8
-      - ML_SEVERITY_MEDIUM=0.5
-      - ML_RETRAIN_LOCK_KEY=41003
-      - ML_AUTO_PROMOTE=true
-      - ML_AUTO_RETRAIN_MIN_HOURS=24
-      - ML_PROMOTION_MIN_ALERT_RATE_IMPROVEMENT=0.01
-      - ML_PROMOTION_MIN_SAMPLES_RATIO=0.8
-    volumes:
-      - ai-ml-models:/app/contexts/ml_models
+      - DOMAIN=agriculture
+      - MAX_ACTIONS_ALLOWED=4
     ports:
       - "8090:8090"
     extra_hosts:
@@ -106,4 +84,3 @@ services:
 volumes:
   ai-db_data:
   ollama_data:
-  ai-ml-models:

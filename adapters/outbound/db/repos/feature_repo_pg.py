@@ -1,7 +1,12 @@
+import psycopg
+
+from adapters.outbound.observability.logging import log_event
 from adapters.outbound.sql.catalog import list_feature_entries
 from adapters.outbound.sql.executor import SQLExecutor
 from contexts.insights.application.ports.feature_repository import FeatureRepositoryPort, FeatureValue
 from app.config import Settings
+
+HANDLED_DB_ERRORS = (psycopg.Error, OSError)
 
 
 class FeatureRepositoryPG(FeatureRepositoryPort):
@@ -12,14 +17,18 @@ class FeatureRepositoryPG(FeatureRepositoryPort):
     def fetch_features(self, project_id: str) -> list[FeatureValue]:
         features: list[FeatureValue] = []
         for entry in list_feature_entries():
-            params = entry.validate_params({"project_id": project_id})
-            rows = self.executor.execute(
-                sql_template=entry.sql_template,
-                params=params,
-                statement_timeout_ms=self.settings.statement_timeout_ms,
-                max_limit=self.settings.max_limit,
-                default_limit=self.settings.default_limit,
-            )
+            try:
+                params = entry.validate_params({"project_id": project_id})
+                rows = self.executor.execute(
+                    sql_template=entry.sql_template,
+                    params=params,
+                    statement_timeout_ms=self.settings.statement_timeout_ms,
+                    max_limit=self.settings.max_limit,
+                    default_limit=self.settings.default_limit,
+                )
+            except HANDLED_DB_ERRORS as exc:
+                log_event("feature.query.error", {"query_id": entry.query_id, "project_id": project_id, "error": str(exc)[:200]})
+                continue
             for row in rows:
                 window = "all"
                 if entry.query_id.endswith("_last_30d"):

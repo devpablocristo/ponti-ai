@@ -1,6 +1,11 @@
 import hashlib
 import json
+import threading
+import time
+import contextvars
+from contextlib import contextmanager
 from dataclasses import dataclass
+from math import ceil
 from typing import Any
 
 import httpx
@@ -18,6 +23,14 @@ class LLMError(RuntimeError):
     pass
 
 
+class LLMRateLimitError(LLMError):
+    pass
+
+
+class LLMBudgetExceededError(LLMError):
+    pass
+
+
 @dataclass(frozen=True)
 class LLMCompletion:
     provider: str
@@ -30,9 +43,42 @@ class LLMClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.logger = get_logger("ai-copilot.llm")
+        self._rate_limiter = _GlobalRateLimiter(rps=float(self.settings.llm_rate_limit_rps))
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
         raise NotImplementedError
+
+    @contextmanager
+    def request_scope(self):
+        state = _RequestBudgetState(
+            calls_left=int(self.settings.llm_max_calls_per_request),
+            tokens_left=int(self.settings.llm_budget_tokens_per_request),
+        )
+        token = _REQUEST_BUDGET.set(state)
+        try:
+            yield
+        finally:
+            _REQUEST_BUDGET.reset(token)
+
+    def _enforce_limits(self, *, system_prompt: str, user_prompt: str) -> None:
+        self._rate_limiter.acquire()
+        budget = _REQUEST_BUDGET.get()
+        is_scoped = budget is not None
+        if budget is None:
+            budget = _RequestBudgetState(
+                calls_left=int(self.settings.llm_max_calls_per_request),
+                tokens_left=int(self.settings.llm_budget_tokens_per_request),
+            )
+        if budget.calls_left <= 0:
+            raise LLMBudgetExceededError("llm_budget_calls_exceeded")
+        estimated_tokens = _estimate_tokens(system_prompt) + _estimate_tokens(user_prompt)
+        estimated_tokens += int(self.settings.llm_max_output_tokens)
+        if budget.tokens_left < estimated_tokens:
+            raise LLMBudgetExceededError("llm_budget_tokens_exceeded")
+        budget.calls_left -= 1
+        budget.tokens_left -= estimated_tokens
+        if is_scoped:
+            _REQUEST_BUDGET.set(budget)
 
 
 class StubLLMClient(LLMClient):
@@ -42,6 +88,7 @@ class StubLLMClient(LLMClient):
     """
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
+        self._enforce_limits(system_prompt=system_prompt, user_prompt=user_prompt)
         _ = system_prompt
         # Heurística simple: si el prompt menciona "COPILOT_EXPLAIN", devuelve explicación;
         # caso contrario devuelve propuesta.
@@ -98,7 +145,8 @@ class OpenAIChatCompletionsClient(LLMClient):
         raise LLMError("No se pudo obtener respuesta del LLM (retries agotados)")
 
     def _complete_json_once(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
-        timeout = httpx.Timeout(self.settings.llm_timeout_s)
+        self._enforce_limits(system_prompt=system_prompt, user_prompt=user_prompt)
+        timeout = httpx.Timeout(float(self.settings.llm_timeout_ms) / 1000.0)
         headers = {"Authorization": f"Bearer {self.settings.llm_api_key}"}
 
         # Redacted logging: no loguear prompt completo.
@@ -123,6 +171,7 @@ class OpenAIChatCompletionsClient(LLMClient):
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0,
+            "max_tokens": int(self.settings.llm_max_output_tokens),
         }
         # Si el modelo soporta JSON mode, esto ayuda a forzar salida estructurada.
         body["response_format"] = {"type": "json_object"}
@@ -176,7 +225,8 @@ class GoogleAIStudioGenerateContentClient(LLMClient):
         raise LLMError("No se pudo obtener respuesta del LLM (retries agotados)")
 
     def _complete_json_once(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
-        timeout = httpx.Timeout(self.settings.llm_timeout_s)
+        self._enforce_limits(system_prompt=system_prompt, user_prompt=user_prompt)
+        timeout = httpx.Timeout(float(self.settings.llm_timeout_ms) / 1000.0)
         headers = {"x-goog-api-key": self.settings.llm_api_key}
 
         digest = hashlib.sha256((system_prompt + "\n" + user_prompt).encode("utf-8")).hexdigest()[:12]
@@ -205,6 +255,7 @@ class GoogleAIStudioGenerateContentClient(LLMClient):
             "generationConfig": {
                 "temperature": 0,
                 "responseMimeType": "application/json",
+                "maxOutputTokens": int(self.settings.llm_max_output_tokens),
             },
         }
 
@@ -262,8 +313,9 @@ class OllamaChatClient(LLMClient):
         raise LLMError("No se pudo obtener respuesta del LLM (retries agotados)")
 
     def _complete_json_once(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:
+        self._enforce_limits(system_prompt=system_prompt, user_prompt=user_prompt)
         # Protege la latencia de endpoints copilot aun si el timeout global es alto.
-        timeout = httpx.Timeout(min(float(self.settings.llm_timeout_s), 30.0))
+        timeout = httpx.Timeout(min(float(self.settings.llm_timeout_ms) / 1000.0, 30.0))
 
         digest = hashlib.sha256((system_prompt + "\n" + user_prompt).encode("utf-8")).hexdigest()[:12]
         self.logger.info(
@@ -286,7 +338,7 @@ class OllamaChatClient(LLMClient):
                 {"role": "user", "content": user_prompt},
             ],
             "stream": False,
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_predict": int(self.settings.llm_max_output_tokens)},
             # Ollama moderno soporta format=json (fuerza JSON). Si el runtime lo ignora,
             # igual validamos el JSON al parsear aguas abajo.
             "format": "json",
@@ -355,3 +407,36 @@ def _safe_http_error_detail(resp: httpx.Response) -> str:
         return (resp.text or "").strip()[:300] or "unknown_error"
     except HANDLED_LLM_TRANSPORT_ERRORS:
         return "unknown_error"
+
+
+@dataclass
+class _RequestBudgetState:
+    calls_left: int
+    tokens_left: int
+
+
+class _GlobalRateLimiter:
+    def __init__(self, rps: float) -> None:
+        self.rps = max(0.1, float(rps))
+        self._lock = threading.Lock()
+        self._last_call_monotonic = 0.0
+
+    def acquire(self) -> None:
+        min_interval = 1.0 / self.rps
+        now = time.monotonic()
+        with self._lock:
+            if now - self._last_call_monotonic < min_interval:
+                raise LLMRateLimitError("llm_global_rate_limit_exceeded")
+            self._last_call_monotonic = now
+
+
+def _estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return max(1, ceil(len(text) / 4))
+
+
+_REQUEST_BUDGET: contextvars.ContextVar[_RequestBudgetState | None] = contextvars.ContextVar(
+    "llm_request_budget",
+    default=None,
+)

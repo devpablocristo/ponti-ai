@@ -16,6 +16,8 @@ from adapters.outbound.observability.logging import log_event
 from adapters.outbound.observability.metrics import inc_counter, observe_ms
 
 router = APIRouter()
+ALLOWED_ACTIONS = {"ack", "acknowledged", "snooze", "snoozed", "resolved"}
+ALLOWED_NEW_STATUS = {"acknowledged", "snoozed", "resolved"}
 
 
 def _to_insight_item(insight) -> InsightItem:
@@ -55,12 +57,18 @@ def compute_insights(
     container: AppContainer = Depends(get_container),
 ) -> ComputeInsightsResponse:
     started = time.time()
-    result = container.compute_insights.handle(project_id=auth.project_id, user_id=auth.user_id)
+    try:
+        result = container.compute_insights.handle(project_id=auth.project_id, user_id=auth.user_id)
+    except Exception as exc:
+        duration_ms = int((time.time() - started) * 1000)
+        observe_ms("insights.compute.duration_ms", duration_ms)
+        inc_counter("insights.compute.error", 1)
+        log_event("insights.compute.error", {"project_id": auth.project_id, "error": str(exc)[:200]})
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al computar insights")
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
     inc_counter("insights.compute.count", 1)
     inc_counter("insights.compute.rules_created", int(result.rules_insights_created))
-    inc_counter("insights.compute.ml_created", int(result.ml_insights_created))
     log_event(
         "insights.compute",
         {
@@ -69,7 +77,6 @@ def compute_insights(
             "computed": result.computed,
             "created": result.insights_created,
             "rules_created": int(result.rules_insights_created),
-            "ml_created": int(result.ml_insights_created),
             "status": "ok",
         },
     )
@@ -145,6 +152,10 @@ def record_action(
     container: AppContainer = Depends(get_container),
 ) -> ActionResponse:
     started = time.time()
+    if req.action not in ALLOWED_ACTIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="action invalida")
+    if req.new_status not in ALLOWED_NEW_STATUS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="new_status invalido")
     try:
         result = container.record_action.handle(
             insight_id=insight_id,
