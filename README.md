@@ -1,4 +1,4 @@
-# AI Copilot Service — v1.0.0
+# Ponti AI — v1.0.0
 
 Servicio FastAPI + PostgreSQL para calcular insights determinísticos y ofrecer explainability acotada por insight vía LLM.
 

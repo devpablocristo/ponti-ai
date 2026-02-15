@@ -42,7 +42,7 @@ class LLMCompletion:
 class LLMClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.logger = get_logger("ai-copilot.llm")
+        self.logger = get_logger("ponti-ai.llm")
         self._rate_limiter = _GlobalRateLimiter(rps=float(self.settings.llm_rate_limit_rps))
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> LLMCompletion:

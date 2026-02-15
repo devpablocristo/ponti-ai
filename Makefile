@@ -32,8 +32,8 @@ pull-ollama-models:
 	$(COMPOSE) exec ollama ollama pull llama3.1
 
 smoke:
-	$(COMPOSE) cp scripts/smoke_endpoints.py ai-copilot:/tmp/smoke_endpoints.py
-	$(COMPOSE) exec -T ai-copilot python /tmp/smoke_endpoints.py
+	$(COMPOSE) cp scripts/smoke_endpoints.py ponti-ai:/tmp/smoke_endpoints.py
+	$(COMPOSE) exec -T ponti-ai python /tmp/smoke_endpoints.py
 
 smoke-local:
 	python scripts/smoke_endpoints.py

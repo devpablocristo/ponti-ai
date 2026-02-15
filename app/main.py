@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
         record_action=record_action,
     )
 
-    app = FastAPI(title="AI Copilot Service", version="1.0.0-mvp")
+    app = FastAPI(title="Ponti AI", version="1.0.0-mvp")
     app.state.container = container
     app.include_router(health_router)
     app.include_router(insights_router)
