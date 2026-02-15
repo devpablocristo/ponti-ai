@@ -30,7 +30,7 @@ jobs:
       CLOUD_RUN_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
       WIF_PROVIDER: projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
-      APP_NAME: ai-copilot-service
+      APP_NAME: ponti-ai
       APP_ENV: dev
       STATEMENT_TIMEOUT_MS: "20000"
       MAX_LIMIT: "200"

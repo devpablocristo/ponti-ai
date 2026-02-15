@@ -1,4 +1,4 @@
--- Tabla de auditoria del AI Copilot Service
+-- Tabla de auditoria de Ponti AI
 
 CREATE TABLE IF NOT EXISTS ai_audit_logs (
     request_id UUID PRIMARY KEY,

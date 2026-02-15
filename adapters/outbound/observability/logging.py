@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 
-def get_logger(name: str = "ai-copilot") -> logging.Logger:
+def get_logger(name: str = "ponti-ai") -> logging.Logger:
     logger = logging.getLogger(name)
     if logger.handlers:
         logger.propagate = False

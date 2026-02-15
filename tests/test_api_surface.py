@@ -4,7 +4,7 @@ from app.main import create_app
 
 
 def _set_base_env(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    monkeypatch.setenv("APP_NAME", "ai-copilot-service")
+    monkeypatch.setenv("APP_NAME", "ponti-ai")
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DB_DSN", "postgresql://unused")
     monkeypatch.setenv("AI_SERVICE_KEYS", "servicekey123")

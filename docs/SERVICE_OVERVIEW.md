@@ -2,7 +2,7 @@
 
 ## Qué es
 
-`ponti-ai` es una API FastAPI que:
+Ponti AI es una API FastAPI que:
 1. Calcula **insights determinísticos**: compara features de un proyecto contra baselines (percentiles p75/p90) y detecta spikes temporales.
 2. Ofrece **explainability acotada por insight** vía LLM (copilot), con propuestas no vinculantes y explicaciones en 3 modos.
 3. Persiste resultados técnicos en tablas `ai_*` para seguimiento operativo.

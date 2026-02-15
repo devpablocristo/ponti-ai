@@ -1,4 +1,4 @@
--- Seed mínimo para probar insights en ai_copilot (sin Ponti completo)
+-- Seed mínimo para probar insights en ponti_ai (sin Ponti completo)
 -- Ejecutar: psql $DB_DSN -f scripts/seed_insights_test_data.sql
 
 BEGIN;
