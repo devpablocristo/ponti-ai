@@ -22,44 +22,44 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
-      ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
-      IMAGE_NAME: ${{ vars.IMAGE_NAME }}
-      SERVICE_NAME: ${{ vars.SERVICE_NAME_DEV }}
-      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV }}
-      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
-      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
-      APP_NAME: ${{ vars.APP_NAME }}
+      GCP_REGION: us-central1
+      GCP_PROJECT_ID: new-ponti-dev
+      ARTIFACT_REGISTRY: ponti-ai-registry
+      IMAGE_NAME: ponti-ai
+      SERVICE_NAME: ponti-ai-dev
+      CLOUD_RUN_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
+      WIF_PROVIDER: projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
+      APP_NAME: ai-copilot-service
       APP_ENV: dev
-      STATEMENT_TIMEOUT_MS: ${{ vars.STATEMENT_TIMEOUT_MS }}
-      MAX_LIMIT: ${{ vars.MAX_LIMIT }}
-      DEFAULT_LIMIT: ${{ vars.DEFAULT_LIMIT }}
-      COPILOT_ENABLED: ${{ vars.COPILOT_ENABLED }}
-      LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
-      LLM_MODEL: ${{ vars.LLM_MODEL }}
-      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
-      LLM_TIMEOUT_MS: ${{ vars.LLM_TIMEOUT_MS }}
-      LLM_MAX_RETRIES: ${{ vars.LLM_MAX_RETRIES }}
-      LLM_MAX_OUTPUT_TOKENS: ${{ vars.LLM_MAX_OUTPUT_TOKENS }}
-      LLM_MAX_CALLS_PER_REQUEST: ${{ vars.LLM_MAX_CALLS_PER_REQUEST }}
-      LLM_BUDGET_TOKENS_PER_REQUEST: ${{ vars.LLM_BUDGET_TOKENS_PER_REQUEST }}
-      LLM_RATE_LIMIT_RPS: ${{ vars.LLM_RATE_LIMIT_RPS }}
-      INSIGHTS_RATIO_HIGH: ${{ vars.INSIGHTS_RATIO_HIGH }}
-      INSIGHTS_RATIO_MEDIUM: ${{ vars.INSIGHTS_RATIO_MEDIUM }}
-      INSIGHTS_SPIKE_RATIO: ${{ vars.INSIGHTS_SPIKE_RATIO }}
-      INSIGHTS_COOLDOWN_DAYS: ${{ vars.INSIGHTS_COOLDOWN_DAYS }}
-      INSIGHTS_IMPACT_K: ${{ vars.INSIGHTS_IMPACT_K }}
-      INSIGHTS_IMPACT_CAP: ${{ vars.INSIGHTS_IMPACT_CAP }}
-      INSIGHTS_SIZE_SMALL_MAX: ${{ vars.INSIGHTS_SIZE_SMALL_MAX }}
-      INSIGHTS_SIZE_MEDIUM_MAX: ${{ vars.INSIGHTS_SIZE_MEDIUM_MAX }}
-      DOMAIN: ${{ vars.DOMAIN }}
-      MAX_ACTIONS_ALLOWED: ${{ vars.MAX_ACTIONS_ALLOWED }}
-      PORT: ${{ vars.PORT }}
+      STATEMENT_TIMEOUT_MS: "20000"
+      MAX_LIMIT: "200"
+      DEFAULT_LIMIT: "50"
+      COPILOT_ENABLED: "true"
+      LLM_PROVIDER: "stub"
+      LLM_MODEL: "stub"
+      LLM_BASE_URL: "http://localhost:11434"
+      LLM_TIMEOUT_MS: "5000"
+      LLM_MAX_RETRIES: "3"
+      LLM_MAX_OUTPUT_TOKENS: "700"
+      LLM_MAX_CALLS_PER_REQUEST: "3"
+      LLM_BUDGET_TOKENS_PER_REQUEST: "2500"
+      LLM_RATE_LIMIT_RPS: "2.0"
+      INSIGHTS_RATIO_HIGH: "0.5"
+      INSIGHTS_RATIO_MEDIUM: "0.2"
+      INSIGHTS_SPIKE_RATIO: "1.5"
+      INSIGHTS_COOLDOWN_DAYS: "7"
+      INSIGHTS_IMPACT_K: "1.0"
+      INSIGHTS_IMPACT_CAP: "2.0"
+      INSIGHTS_SIZE_SMALL_MAX: "200"
+      INSIGHTS_SIZE_MEDIUM_MAX: "1000"
+      DOMAIN: "agriculture"
+      MAX_ACTIONS_ALLOWED: "4"
+      PORT: "8090"
       CLOUDSQL_INSTANCE: new-ponti-dev:us-central1:new-ponti-db-dev
       SECRET_DB_DSN_NAME: ai-db-dsn-dev
       SECRET_AI_SERVICE_KEYS_NAME: ai-service-keys-dev
-      SECRET_LLM_API_KEY_NAME: ${{ vars.SECRET_LLM_API_KEY_NAME_DEV }}
+      SECRET_LLM_API_KEY_NAME: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
