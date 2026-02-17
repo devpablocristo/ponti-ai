@@ -109,12 +109,15 @@ class Settings(BaseSettings):
             }
             object.__setattr__(self, "llm_model", default_models.get(provider, "gpt-4o-mini"))
 
-        # Si copilot está habilitado y el provider no es stub, exigir api_key
+        # Si copilot está habilitado, exigir api_key SOLO para providers que lo requieren.
+        # - stub: no usa API externa
+        # - ollama: corre localmente, no requiere API key
         if self.copilot_enabled:
             provider = self.llm_provider.strip().lower()
-            if provider != "stub" and not self.llm_api_key:
+            providers_without_key = {"stub", "ollama"}
+            if provider not in providers_without_key and not self.llm_api_key:
                 raise ValueError(
-                    "LLM_API_KEY es requerido cuando COPILOT_ENABLED=true y LLM_PROVIDER != stub"
+                    "LLM_API_KEY es requerido cuando COPILOT_ENABLED=true y LLM_PROVIDER requiere key"
                 )
 
         return self

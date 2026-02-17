@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GCP_REGION: us-central1
-      GCP_PROJECT_ID: new-ponti-dev
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_DEV }}
       ARTIFACT_REGISTRY: ponti-ai-registry
       IMAGE_NAME: ponti-ai
-      SERVICE_NAME: ponti-ai-dev
-      CLOUD_RUN_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
-      WIF_PROVIDER: projects/1087442197188/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
-      WIF_SERVICE_ACCOUNT: github-actions@new-ponti-dev.iam.gserviceaccount.com
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_AI_DEV }}
+      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_DEV }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_DEV }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_DEV }}
       APP_NAME: ponti-ai
       APP_ENV: dev
       STATEMENT_TIMEOUT_MS: "20000"
@@ -56,7 +56,7 @@ jobs:
       DOMAIN: "agriculture"
       MAX_ACTIONS_ALLOWED: "4"
       PORT: "8090"
-      CLOUDSQL_INSTANCE: new-ponti-dev:us-central1:new-ponti-db-dev
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_DEV }}
       SECRET_DB_DSN_NAME: ai-db-dsn-dev
       SECRET_AI_SERVICE_KEYS_NAME: ai-service-keys-dev
       SECRET_LLM_API_KEY_NAME: ""
