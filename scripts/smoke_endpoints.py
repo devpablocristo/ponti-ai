@@ -9,7 +9,7 @@ import urllib.request
 BASE_URL = os.getenv("SMOKE_BASE_URL", "http://localhost:8090")
 HEADERS = {
     "Content-Type": "application/json",
-    "X-SERVICE-KEY": os.getenv("SMOKE_SERVICE_KEY", "servicekey123"),
+    "X-SERVICE-KEY": os.getenv("SMOKE_SERVICE_KEY", "local-dev-ai-service-key"),
     "X-USER-ID": os.getenv("SMOKE_USER_ID", "123"),
     "X-PROJECT-ID": os.getenv("SMOKE_PROJECT_ID", "1"),
 }

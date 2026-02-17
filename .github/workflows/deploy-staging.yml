@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GCP_REGION: us-central1
-      GCP_PROJECT_ID: new-ponti-stg
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID_STG }}
       ARTIFACT_REGISTRY: ponti-ai-registry
       IMAGE_NAME: ponti-ai
-      SERVICE_NAME: ponti-ai-staging
-      CLOUD_RUN_SERVICE_ACCOUNT: github-actions@new-ponti-stg.iam.gserviceaccount.com
-      WIF_PROVIDER: projects/65243764597/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
-      WIF_SERVICE_ACCOUNT: github-actions@new-ponti-stg.iam.gserviceaccount.com
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_AI_STG }}
+      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_STG }}
+      WIF_PROVIDER: ${{ vars.WIF_PROVIDER_STG }}
+      WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
       APP_NAME: ponti-ai
       APP_ENV: staging
       STATEMENT_TIMEOUT_MS: "20000"
@@ -56,7 +56,7 @@ jobs:
       DOMAIN: "agriculture"
       MAX_ACTIONS_ALLOWED: "4"
       PORT: "8090"
-      CLOUDSQL_INSTANCE: new-ponti-dev:us-central1:new-ponti-db-dev
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_STG }}
       # Requisito solicitado: usar la instancia de DEV para la base de datos.
       SECRET_DB_DSN_NAME: ai-db-dsn-staging
       SECRET_AI_SERVICE_KEYS_NAME: ai-service-keys-staging
