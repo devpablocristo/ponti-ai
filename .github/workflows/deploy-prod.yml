@@ -1,0 +1,146 @@
+name: Deploy AI PROD (promote STAGING artifact)
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_sha:
+        description: "SHA a promover desde STAGING (imagen tag = sha)"
+        required: true
+      reason:
+        description: "Motivo / ticket (texto libre)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-ai-prod
+  cancel-in-progress: false
+
+jobs:
+  promote-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      # STAGING usa repo regional (us-central1). PROD usa repo multi-region (us).
+      STG_REGISTRY_HOST: us-central1-docker.pkg.dev
+      PROD_REGISTRY_HOST: us-docker.pkg.dev
+      PROD_LOCATION: us
+      ARTIFACT_REGISTRY: ponti-ai-registry
+      IMAGE_NAME: ponti-ai
+
+      # STAGING (source image)
+      GCP_PROJECT_ID_STG: ${{ vars.GCP_PROJECT_ID_STG }}
+      WIF_PROVIDER_STG: ${{ vars.WIF_PROVIDER_STG }}
+      WIF_SERVICE_ACCOUNT_STG: ${{ vars.WIF_SERVICE_ACCOUNT_STG }}
+
+      # PROD (target deploy)
+      GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_AI_PROD }}
+      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_PROD }}
+      WIF_PROVIDER_PROD: ${{ vars.WIF_PROVIDER_PROD }}
+      WIF_SERVICE_ACCOUNT_PROD: ${{ vars.WIF_SERVICE_ACCOUNT_PROD }}
+
+      APP_NAME: ponti-ai
+      APP_ENV: prod
+      STATEMENT_TIMEOUT_MS: "20000"
+      MAX_LIMIT: "200"
+      DEFAULT_LIMIT: "50"
+      COPILOT_ENABLED: "true"
+      LLM_PROVIDER: "stub"
+      LLM_MODEL: "stub"
+      LLM_BASE_URL: "http://localhost:11434"
+      LLM_TIMEOUT_MS: "5000"
+      LLM_MAX_RETRIES: "3"
+      LLM_MAX_OUTPUT_TOKENS: "700"
+      LLM_MAX_CALLS_PER_REQUEST: "3"
+      LLM_BUDGET_TOKENS_PER_REQUEST: "2500"
+      LLM_RATE_LIMIT_RPS: "2.0"
+      INSIGHTS_RATIO_HIGH: "0.5"
+      INSIGHTS_RATIO_MEDIUM: "0.2"
+      INSIGHTS_SPIKE_RATIO: "1.5"
+      INSIGHTS_COOLDOWN_DAYS: "7"
+      INSIGHTS_IMPACT_K: "1.0"
+      INSIGHTS_IMPACT_CAP: "2.0"
+      INSIGHTS_SIZE_SMALL_MAX: "200"
+      INSIGHTS_SIZE_MEDIUM_MAX: "1000"
+      DOMAIN: "agriculture"
+      MAX_ACTIONS_ALLOWED: "4"
+      PORT: "8090"
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE_PROD }}
+      # Requisito solicitado: PROD usa instancia shared (dev).
+      SECRET_DB_DSN_NAME: ai-db-dsn-prod
+      SECRET_AI_SERVICE_KEYS_NAME: ai-service-keys-prod
+      SECRET_LLM_API_KEY_NAME: ""
+
+    steps:
+      - name: Checkout (solo para metadata)
+        uses: actions/checkout@v4
+
+      - name: Auth GCP (STAGING - pull Artifact)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER_STG }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_STG }}
+
+      - name: Setup gcloud (STAGING)
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID_STG }}
+
+      - name: Configure Docker auth (STAGING)
+        run: gcloud auth configure-docker "${{ env.STG_REGISTRY_HOST }}" --quiet
+
+      - name: Pull imagen de STAGING
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          src_image="${STG_REGISTRY_HOST}/${GCP_PROJECT_ID_STG}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${STAGING_SHA}"
+          echo "SRC_IMAGE=$src_image" >> "$GITHUB_ENV"
+          docker pull "$src_image"
+
+      - name: Auth GCP (PROD - push + deploy)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER_PROD }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT_PROD }}
+
+      - name: Setup gcloud (PROD)
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID_PROD }}
+
+      - name: Configure Docker auth (PROD)
+        run: gcloud auth configure-docker "${{ env.PROD_REGISTRY_HOST }}" --quiet
+
+      - name: Push imagen a PROD (retag)
+        env:
+          STAGING_SHA: ${{ github.event.inputs.staging_sha }}
+        run: |
+          dst_sha="${PROD_REGISTRY_HOST}/${GCP_PROJECT_ID_PROD}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${STAGING_SHA}"
+          dst_prod="${PROD_REGISTRY_HOST}/${GCP_PROJECT_ID_PROD}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:prod"
+          docker tag "$SRC_IMAGE" "$dst_sha"
+          docker tag "$SRC_IMAGE" "$dst_prod"
+          docker push "$dst_sha"
+          docker push "$dst_prod"
+          echo "IMAGE_URI=$dst_sha" >> "$GITHUB_ENV"
+
+      - name: Deploy a Cloud Run (PROD)
+        run: |
+          ENV_VARS="APP_NAME=${APP_NAME},APP_ENV=${APP_ENV},STATEMENT_TIMEOUT_MS=${STATEMENT_TIMEOUT_MS},MAX_LIMIT=${MAX_LIMIT},DEFAULT_LIMIT=${DEFAULT_LIMIT},COPILOT_ENABLED=${COPILOT_ENABLED},LLM_PROVIDER=${LLM_PROVIDER},LLM_MODEL=${LLM_MODEL},LLM_BASE_URL=${LLM_BASE_URL},LLM_TIMEOUT_MS=${LLM_TIMEOUT_MS},LLM_MAX_RETRIES=${LLM_MAX_RETRIES},LLM_MAX_OUTPUT_TOKENS=${LLM_MAX_OUTPUT_TOKENS},LLM_MAX_CALLS_PER_REQUEST=${LLM_MAX_CALLS_PER_REQUEST},LLM_BUDGET_TOKENS_PER_REQUEST=${LLM_BUDGET_TOKENS_PER_REQUEST},LLM_RATE_LIMIT_RPS=${LLM_RATE_LIMIT_RPS},INSIGHTS_RATIO_HIGH=${INSIGHTS_RATIO_HIGH},INSIGHTS_RATIO_MEDIUM=${INSIGHTS_RATIO_MEDIUM},INSIGHTS_SPIKE_RATIO=${INSIGHTS_SPIKE_RATIO},INSIGHTS_COOLDOWN_DAYS=${INSIGHTS_COOLDOWN_DAYS},INSIGHTS_IMPACT_K=${INSIGHTS_IMPACT_K},INSIGHTS_IMPACT_CAP=${INSIGHTS_IMPACT_CAP},INSIGHTS_SIZE_SMALL_MAX=${INSIGHTS_SIZE_SMALL_MAX},INSIGHTS_SIZE_MEDIUM_MAX=${INSIGHTS_SIZE_MEDIUM_MAX},DOMAIN=${DOMAIN},MAX_ACTIONS_ALLOWED=${MAX_ACTIONS_ALLOWED}"
+          SECRET_FLAGS="DB_DSN=${SECRET_DB_DSN_NAME}:latest,AI_SERVICE_KEYS=${SECRET_AI_SERVICE_KEYS_NAME}:latest"
+          if [[ -n "${SECRET_LLM_API_KEY_NAME}" ]]; then
+            SECRET_FLAGS="${SECRET_FLAGS},LLM_API_KEY=${SECRET_LLM_API_KEY_NAME}:latest"
+          fi
+          gcloud run deploy "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID_PROD" \
+            --region="us-central1" \
+            --image="$IMAGE_URI" \
+            --service-account="$CLOUD_RUN_SERVICE_ACCOUNT" \
+            --add-cloudsql-instances="$CLOUDSQL_INSTANCE" \
+            --set-env-vars="${ENV_VARS}" \
+            --set-secrets="${SECRET_FLAGS}" \
+            --allow-unauthenticated \
+            --port="${PORT:-8090}"
+
