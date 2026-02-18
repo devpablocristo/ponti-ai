@@ -1,0 +1,17 @@
+---
+description: Reglas base del proyecto Ponti AI
+alwaysApply: true
+---
+
+# Reglas base Ponti AI
+
+## Infra (GCP) - Contexto del proyecto
+- Ambientes: `dev` (proyecto `new-ponti-dev`) y `staging` (proyecto `new-ponti-stg`).
+- Cloud Run: service canónico `ponti-ai` (no crear duplicados tipo `ponti-ai-dev`).
+- Cloud SQL: para ahorrar recursos, `dev` y `staging` comparten la MISMA instancia:
+  - connection name: `new-ponti-dev:us-central1:new-ponti-db-dev`
+  - la separación es por DB en `DB_DSN`.
+- DBs usadas por ambiente:
+  - `dev`: `ponti_ai_dev`
+  - `staging`: `ponti_ai_staging`
+
