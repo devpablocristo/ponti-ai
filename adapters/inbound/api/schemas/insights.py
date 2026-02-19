@@ -62,6 +62,14 @@ class HealthStatusResponse(BaseModel):
     status: str
 
 
+class VersionResponse(BaseModel):
+    service: str
+    version: str
+    git_sha: str = ""
+    build_time: str = ""
+    api_version: str = "v1"
+
+
 class MetricsSnapshotResponse(BaseModel):
     counters: dict[str, float] = Field(default_factory=dict)
     timers: dict[str, dict[str, float]] = Field(default_factory=dict)
