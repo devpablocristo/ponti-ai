@@ -106,3 +106,39 @@ jobs:
             --set-secrets="${SECRET_FLAGS}" \
             --allow-unauthenticated \
             --port="${PORT:-8090}"
+
+      - name: Resolve service URL (DEV)
+        run: |
+          service_url="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          if [[ -z "$service_url" ]]; then
+            echo "ERROR: no se pudo resolver status.url del servicio AI DEV."
+            exit 1
+          fi
+          echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
+
+      - name: Read AI service key secret (DEV)
+        run: |
+          raw_keys="$(gcloud secrets versions access latest \
+            --project="$GCP_PROJECT_ID" \
+            --secret="$SECRET_AI_SERVICE_KEYS_NAME")"
+          if [[ -z "$raw_keys" ]]; then
+            echo "ERROR: AI_SERVICE_KEYS vacío en DEV."
+            exit 1
+          fi
+          smoke_key="$(printf "%s" "$raw_keys" | awk -F',' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}')"
+          if [[ -z "$smoke_key" ]]; then
+            echo "ERROR: no se pudo resolver una service key válida para smoke DEV."
+            exit 1
+          fi
+          echo "::add-mask::$smoke_key"
+          echo "SMOKE_SERVICE_KEY=$smoke_key" >> "$GITHUB_ENV"
+
+      - name: Smoke release checks (DEV)
+        run: |
+          python3 scripts/smoke_endpoints.py
+        env:
+          SMOKE_BASE_URL: ${{ env.SERVICE_URL }}
+          SMOKE_SERVICE_KEY: ${{ env.SMOKE_SERVICE_KEY }}

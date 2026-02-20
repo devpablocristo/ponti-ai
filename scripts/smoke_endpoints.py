@@ -7,9 +7,16 @@ import urllib.request
 
 
 BASE_URL = os.getenv("SMOKE_BASE_URL", "http://localhost:8090")
+raw_service_keys = os.getenv("AI_SERVICE_KEYS", "")
+fallback_service_key = ""
+for _k in raw_service_keys.split(","):
+    candidate = _k.strip()
+    if candidate:
+        fallback_service_key = candidate
+        break
 HEADERS = {
     "Content-Type": "application/json",
-    "X-SERVICE-KEY": os.getenv("SMOKE_SERVICE_KEY", "local-dev-ai-service-key"),
+    "X-SERVICE-KEY": os.getenv("SMOKE_SERVICE_KEY", fallback_service_key or "local-dev-ai-service-key"),
     "X-USER-ID": os.getenv("SMOKE_USER_ID", "123"),
     "X-PROJECT-ID": os.getenv("SMOKE_PROJECT_ID", "1"),
 }
