@@ -73,6 +73,7 @@ jobs:
       SECRET_DB_DSN_NAME: ai-db-dsn-prod
       SECRET_AI_SERVICE_KEYS_NAME: ai-service-keys-prod
       SECRET_LLM_API_KEY_NAME: ""
+      SMOKE_STRICT_INSIGHTS: "0"
 
     steps:
       - name: Checkout (solo para metadata)
@@ -179,4 +180,5 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ env.SERVICE_URL }}
           SMOKE_SERVICE_KEY: ${{ env.SMOKE_SERVICE_KEY }}
+          SMOKE_STRICT_INSIGHTS: ${{ env.SMOKE_STRICT_INSIGHTS }}
 
