@@ -54,8 +54,8 @@ def ok(status_code: int) -> bool:
 
 def main() -> int:
     checks = [
-        call("GET /healthz", "GET", "/healthz"),
-        call("GET /readyz", "GET", "/readyz"),
+        call("GET /v1/healthz", "GET", "/v1/healthz"),
+        call("GET /v1/readyz", "GET", "/v1/readyz"),
         call("GET /metrics", "GET", "/metrics"),
         call("POST /v1/insights/compute", "POST", "/v1/insights/compute", {}, auth=True),
         call("GET /v1/insights/summary", "GET", "/v1/insights/summary", auth=True),
