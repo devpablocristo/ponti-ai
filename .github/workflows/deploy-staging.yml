@@ -121,6 +121,39 @@ jobs:
           fi
           echo "SERVICE_URL=$service_url" >> "$GITHUB_ENV"
 
+      - name: "Guardrail: traffic/latest + detagged service URLs (STAGING)"
+        run: |
+          service_json="$(gcloud run services describe "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='json')"
+          SERVICE_JSON="$service_json" python3 - <<'PY'
+          import json, os, sys
+          svc = json.loads(os.environ["SERVICE_JSON"])
+          traffic = svc.get("status", {}).get("traffic", [])
+          ok_latest = any(t.get("latestRevision") is True and int(t.get("percent", 0)) == 100 for t in traffic)
+          if not ok_latest:
+              print("ERROR: guardrail falló: tráfico no está 100% en latestRevision.")
+              sys.exit(1)
+          envs = svc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
+          bad = []
+          watched = {"BASE_MANAGER_API", "AI_SERVICE_URL"}
+          for e in envs:
+              name = e.get("name", "")
+              value = e.get("value", "")
+              if not value:
+                  continue
+              if name in watched or name.endswith("_URL"):
+                  if "---" in value:
+                      bad.append(f"{name}={value}")
+          if bad:
+              print("ERROR: guardrail falló: URLs internas taggeadas detectadas:")
+              for item in bad:
+                  print(f" - {item}")
+              sys.exit(1)
+          print("Guardrail OK: latestRevision=100% y sin URLs taggeadas.")
+          PY
+
       - name: Read AI service key secret (STAGING)
         run: |
           raw_keys="$(gcloud secrets versions access latest \
