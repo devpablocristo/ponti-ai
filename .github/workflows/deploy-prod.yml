@@ -37,7 +37,7 @@ jobs:
 
       # PROD (target deploy)
       GCP_PROJECT_ID_PROD: ${{ vars.GCP_PROJECT_ID_PROD }}
-      CLOUD_RUN_REGION_PROD: ${{ vars.GCP_REGION_PROD || 'europe-west1' }}
+      CLOUD_RUN_REGION_PROD: ${{ vars.GCP_REGION_PROD }}
       SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE_AI_PROD }}
       CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT_PROD }}
       WIF_PROVIDER_PROD: ${{ vars.WIF_PROVIDER_PROD }}
@@ -215,4 +215,3 @@ jobs:
           SMOKE_BASE_URL: ${{ env.SERVICE_URL }}
           SMOKE_SERVICE_KEY: ${{ env.SMOKE_SERVICE_KEY }}
           SMOKE_STRICT_INSIGHTS: ${{ env.SMOKE_STRICT_INSIGHTS }}
-
