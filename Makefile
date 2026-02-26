@@ -23,7 +23,7 @@ migrate:
 	$(COMPOSE) run --rm ai-migrate
 
 run:
-	uvicorn app.main:app --reload --port $(UVICORN_PORT)
+	uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
 
 test:
 	PYTHONPATH=. python -m pytest

@@ -87,6 +87,3 @@ def create_app() -> FastAPI:
     if settings.copilot_enabled:
         app.include_router(copilot_router)
     return app
-
-
-app = create_app()
