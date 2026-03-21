@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core_ai.completions import validate_json_completion
 from adapters.outbound.llm.client import LLMClient
 from adapters.outbound.llm.prompts import INSIGHT_PLANNER_PROMPT_VERSION, INSIGHT_PLANNER_SYSTEM_PROMPT, INSIGHT_PLANNER_USER_PROMPT_TEMPLATE
 from adapters.outbound.tools.catalog import TOOLS_CATALOG_VERSION, list_tools_as_json, validate_tool_args
@@ -87,11 +88,9 @@ class InsightPlannerLLM(InsightPlannerPort):
         completion = self.llm.complete_json(system_prompt=INSIGHT_PLANNER_SYSTEM_PROMPT, user_prompt=user_prompt)
 
         try:
-            parsed = json.loads(completion.content)
+            proposal = validate_json_completion(completion.content, _Proposal)
         except json.JSONDecodeError as exc:
             raise ValueError("LLM devolvió JSON inválido") from exc
-
-        proposal = _Proposal.model_validate(parsed)
 
         # Enforce MAX_ACTIONS a nivel sistema (control > modelo).
         max_actions = max(int(max_actions_allowed), 0)

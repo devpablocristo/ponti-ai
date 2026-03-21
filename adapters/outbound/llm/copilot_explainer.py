@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core_ai.completions import validate_json_completion
 from adapters.outbound.llm.client import LLMBudgetExceededError, LLMClient, LLMError, LLMRateLimitError
 from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_PROMPT_VERSION,
@@ -42,8 +43,7 @@ class CopilotExplainerLLM(CopilotExplainerPort):
         )
         try:
             completion = self.llm.complete_json(system_prompt=COPILOT_EXPLAIN_SYSTEM_PROMPT, user_prompt=user_prompt)
-            payload = json.loads(completion.content)
-            out = _ExplainOut.model_validate(payload)
+            out = validate_json_completion(completion.content, _ExplainOut)
             return out.model_dump()
         except (LLMRateLimitError, LLMBudgetExceededError):
             raise

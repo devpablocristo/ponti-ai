@@ -23,10 +23,10 @@ migrate:
 	$(COMPOSE) run --rm ai-migrate
 
 run:
-	uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
+	PYTHONPATH=.:../../core/ai/python/src uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
 
 test:
-	PYTHONPATH=. python -m pytest
+	PYTHONPATH=.:../../core/ai/python/src python -m pytest
 
 pull-ollama-models:
 	$(COMPOSE) exec ollama ollama pull llama3.1

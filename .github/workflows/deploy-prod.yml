@@ -80,6 +80,12 @@ jobs:
       - name: Checkout (solo para metadata)
         uses: actions/checkout@v4
 
+      - name: Checkout core
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+
       - name: Auth GCP (STAGING - pull Artifact)
         uses: google-github-actions/auth@v2
         with:

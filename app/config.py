@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from core_ai.config.llm import resolve_model_name, validate_provider_api_key
 
 
 class Settings(BaseSettings):
@@ -97,28 +98,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _resolve_model_and_validate_provider(self) -> "Settings":
-        # Auto-resolver llm_model si no se proporcionó
-        if self.llm_model is None:
-            provider = self.llm_provider.strip().lower()
-            default_models = {
-                "stub": "stub",
-                "google": "gemini-flash-latest",
-                "google_ai_studio": "gemini-flash-latest",
-                "gemini": "gemini-flash-latest",
-                "ollama": "llama3.1",
-            }
-            object.__setattr__(self, "llm_model", default_models.get(provider, "gpt-4o-mini"))
-
-        # Si copilot está habilitado, exigir api_key SOLO para providers que lo requieren.
-        # - stub: no usa API externa
-        # - ollama: corre localmente, no requiere API key
-        if self.copilot_enabled:
-            provider = self.llm_provider.strip().lower()
-            providers_without_key = {"stub", "ollama"}
-            if provider not in providers_without_key and not self.llm_api_key:
-                raise ValueError(
-                    "LLM_API_KEY es requerido cuando COPILOT_ENABLED=true y LLM_PROVIDER requiere key"
-                )
+        object.__setattr__(self, "llm_model", resolve_model_name(self.llm_provider, self.llm_model))
+        validate_provider_api_key(
+            self.llm_provider,
+            self.llm_api_key,
+            enabled=self.copilot_enabled,
+            error_message="LLM_API_KEY es requerido cuando COPILOT_ENABLED=true y LLM_PROVIDER requiere key",
+        )
 
         return self
 

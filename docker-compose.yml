@@ -33,7 +33,9 @@ services:
     command: ["-path", "/migrations", "-database", "postgresql://postgres:postgres@ai-db:5432/ponti_ai?sslmode=disable", "up"]
 
   ponti-ai:
-    build: .
+    build:
+      context: ../..
+      dockerfile: ./ponti/ponti-ai/Dockerfile.workspace
     depends_on:
       ai-db:
         condition: service_healthy
@@ -47,7 +49,9 @@ services:
       - "host.docker.internal:host-gateway"
 
   ai-test:
-    build: .
+    build:
+      context: ../..
+      dockerfile: ./ponti/ponti-ai/Dockerfile.workspace
     working_dir: /app
     environment:
       - PYTHONPATH=/app
