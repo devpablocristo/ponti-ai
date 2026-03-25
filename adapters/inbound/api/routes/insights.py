@@ -2,7 +2,8 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from adapters.inbound.api.auth.headers import AuthContext, require_headers
+from adapters.inbound.api.auth.headers import require_headers
+from core_ai.contexts import AuthContext
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.insights import (
     ActionRequest,
@@ -58,12 +59,12 @@ def compute_insights(
 ) -> ComputeInsightsResponse:
     started = time.time()
     try:
-        result = container.compute_insights.handle(project_id=auth.project_id, user_id=auth.user_id)
+        result = container.compute_insights.handle(project_id=auth.tenant_id, user_id=auth.actor)
     except Exception as exc:
         duration_ms = int((time.time() - started) * 1000)
         observe_ms("insights.compute.duration_ms", duration_ms)
         inc_counter("insights.compute.error", 1)
-        log_event("insights.compute.error", {"project_id": auth.project_id, "error": str(exc)[:200]})
+        log_event("insights.compute.error", {"project_id": auth.tenant_id, "error": str(exc)[:200]})
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al computar insights")
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
@@ -73,7 +74,7 @@ def compute_insights(
         "insights.compute",
         {
             "request_id": result.request_id,
-            "project_id": auth.project_id,
+            "project_id": auth.tenant_id,
             "computed": result.computed,
             "created": result.insights_created,
             "rules_created": int(result.rules_insights_created),
@@ -96,7 +97,7 @@ def get_insights(
 ) -> InsightListResponse:
     started = time.time()
     insights = container.get_insights.handle(
-        project_id=auth.project_id,
+        project_id=auth.tenant_id,
         entity_type=entity_type,
         entity_id=entity_id,
     )
@@ -107,7 +108,7 @@ def get_insights(
     log_event(
         "insights.get",
         {
-            "project_id": auth.project_id,
+            "project_id": auth.tenant_id,
             "entity_type": entity_type,
             "entity_id": entity_id,
             "count": len(items),
@@ -123,7 +124,7 @@ def get_summary(
     container: AppContainer = Depends(get_container),
 ) -> SummaryResponse:
     started = time.time()
-    summary = container.get_summary.handle(project_id=auth.project_id)
+    summary = container.get_summary.handle(project_id=auth.tenant_id)
     top_items = [_to_insight_item(insight) for insight in summary.top_insights]
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.summary.duration_ms", duration_ms)
@@ -131,7 +132,7 @@ def get_summary(
     log_event(
         "insights.summary",
         {
-            "project_id": auth.project_id,
+            "project_id": auth.tenant_id,
             "new_total": summary.new_count_total,
             "new_high": summary.new_count_high_severity,
             "status": "ok",
@@ -159,8 +160,8 @@ def record_action(
     try:
         result = container.record_action.handle(
             insight_id=insight_id,
-            project_id=auth.project_id,
-            user_id=auth.user_id,
+            project_id=auth.tenant_id,
+            user_id=auth.actor,
             action=req.action,
             new_status=req.new_status,
         )
@@ -175,7 +176,7 @@ def record_action(
         "insights.action",
         {
             "request_id": result.request_id,
-            "project_id": auth.project_id,
+            "project_id": auth.tenant_id,
             "insight_id": insight_id,
             "status": "ok",
         },

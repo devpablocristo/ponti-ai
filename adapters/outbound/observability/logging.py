@@ -1,23 +1,13 @@
-import json
-import logging
+# Delega a core_ai.logging para logging estructurado.
 from typing import Any
 
+from core_ai.logging import get_logger as _core_get_logger
 
-def get_logger(name: str = "ponti-ai") -> logging.Logger:
-    logger = logging.getLogger(name)
-    if logger.handlers:
-        logger.propagate = False
-        return logger
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
-    return logger
+
+def get_logger(name: str = "ponti-ai") -> Any:
+    return _core_get_logger(name)
 
 
 def log_event(event: str, payload: dict[str, Any]) -> None:
-    logger = get_logger()
-    message = {"event": event, **payload}
-    logger.info(json.dumps(message))
+    logger = _core_get_logger("ponti-ai")
+    logger.info(event, extra=payload)

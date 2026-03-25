@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from adapters.inbound.api.auth.headers import AuthContext, require_headers
+from adapters.inbound.api.auth.headers import require_headers
+from core_ai.contexts import AuthContext
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.copilot import ExplainInsightResponse
 from adapters.outbound.llm.client import LLMBudgetExceededError, LLMRateLimitError
@@ -15,7 +16,7 @@ def copilot_explain(
     container: AppContainer = Depends(get_container),
 ) -> ExplainInsightResponse:
     try:
-        result = container.explain_insight.handle(project_id=auth.project_id, insight_id=insight_id, mode="explain")
+        result = container.explain_insight.handle(project_id=auth.tenant_id, insight_id=insight_id, mode="explain")
     except (LLMRateLimitError, LLMBudgetExceededError) as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except KeyError:
@@ -35,7 +36,7 @@ def copilot_why(
     container: AppContainer = Depends(get_container),
 ) -> ExplainInsightResponse:
     try:
-        result = container.explain_insight.handle(project_id=auth.project_id, insight_id=insight_id, mode="why")
+        result = container.explain_insight.handle(project_id=auth.tenant_id, insight_id=insight_id, mode="why")
     except (LLMRateLimitError, LLMBudgetExceededError) as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except KeyError:
@@ -55,7 +56,7 @@ def copilot_next_steps(
     container: AppContainer = Depends(get_container),
 ) -> ExplainInsightResponse:
     try:
-        result = container.explain_insight.handle(project_id=auth.project_id, insight_id=insight_id, mode="next_steps")
+        result = container.explain_insight.handle(project_id=auth.tenant_id, insight_id=insight_id, mode="next_steps")
     except (LLMRateLimitError, LLMBudgetExceededError) as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     except KeyError:
