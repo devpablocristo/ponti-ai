@@ -25,7 +25,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements.txt
 
@@ -33,6 +33,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install ./core/http/python
           python -m pip install ./core/ai/python
 
       - name: Run tests
@@ -40,3 +41,6 @@ jobs:
           PYTHONPATH: .:core/ai/python/src
         run: |
           python -m pytest
+
+      - name: Build Docker image
+        run: docker build -t ponti-ai-ci-check .
