@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 .PHONY: install up down build migrate run test pull-ollama-models smoke smoke-local
 
 install:
-	python -m pip install -r requirements.txt -e ../../core/http/python -e ../../core/ai/python
+	python -m pip install -r requirements.txt
 
 build:
 	$(COMPOSE) build
@@ -23,11 +23,11 @@ migrate:
 	$(COMPOSE) run --rm ai-migrate
 
 run:
-	PYTHONPATH=.:../../core/ai/python/src:../../core/http/python/src uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
+	PYTHONPATH=. uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
 
 test:
-	python -m pip install -r requirements.txt -e ../../core/http/python -e ../../core/ai/python
-	PYTHONPATH=.:../../core/ai/python/src:../../core/http/python/src python -m pytest
+	python -m pip install -r requirements.txt
+	PYTHONPATH=. python -m pytest
 
 pull-ollama-models:
 	$(COMPOSE) exec ollama ollama pull llama3.1
