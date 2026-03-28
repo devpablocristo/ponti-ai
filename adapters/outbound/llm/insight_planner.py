@@ -3,8 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from core_ai.completions import validate_json_completion
-from adapters.outbound.llm.client import LLMClient
+from core_ai.completions import JSONCompletionClient as LLMClient, validate_json_completion
 from adapters.outbound.llm.prompts import INSIGHT_PLANNER_PROMPT_VERSION, INSIGHT_PLANNER_SYSTEM_PROMPT, INSIGHT_PLANNER_USER_PROMPT_TEMPLATE
 from adapters.outbound.tools.catalog import TOOLS_CATALOG_VERSION, list_tools_as_json, validate_tool_args
 from contexts.insights.application.ports.insight_planner import InsightPlannerPort

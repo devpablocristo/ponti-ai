@@ -10,7 +10,7 @@ from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
 from adapters.outbound.db.repos.proposal_store_pg import ProposalStorePG
-from adapters.outbound.llm.client import build_llm_client
+from core_ai.completions import build_llm_client
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
 from adapters.outbound.llm.insight_planner import InsightPlannerLLM
 from adapters.outbound.models.anomaly_runner import AnomalyRunner
@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     proposal_store = ProposalStorePG(settings)
     baseline_repo = BaselineRepositoryPG(settings)
 
-    llm_client = build_llm_client(settings)
+    llm_client = build_llm_client(settings, logger_name="ponti-ai.llm")
     insight_planner = InsightPlannerLLM(llm_client)
     copilot_explainer = CopilotExplainerLLM(llm_client)
 

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from adapters.inbound.api.auth.headers import require_headers
 from core_ai.contexts import AuthContext
+from core_ai.completions import LLMBudgetExceededError, LLMRateLimitError
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.copilot import ExplainInsightResponse
-from adapters.outbound.llm.client import LLMBudgetExceededError, LLMRateLimitError
 
 router = APIRouter()
 

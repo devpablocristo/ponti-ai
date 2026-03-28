@@ -1,12 +1,13 @@
 import psycopg
 
-from adapters.outbound.observability.logging import log_event
+from core_ai.logging import get_logger
 from adapters.outbound.sql.catalog import list_feature_entries
 from adapters.outbound.sql.executor import SQLExecutor
 from contexts.insights.application.ports.feature_repository import FeatureRepositoryPort, FeatureValue
 from app.config import Settings
 
 HANDLED_DB_ERRORS = (psycopg.Error, OSError)
+logger = get_logger("ponti-ai.feature-repo")
 
 
 class FeatureRepositoryPG(FeatureRepositoryPort):
@@ -27,7 +28,7 @@ class FeatureRepositoryPG(FeatureRepositoryPort):
                     default_limit=self.settings.default_limit,
                 )
             except HANDLED_DB_ERRORS as exc:
-                log_event("feature.query.error", {"query_id": entry.query_id, "project_id": project_id, "error": str(exc)[:200]})
+                logger.info("feature.query.error", query_id=entry.query_id, project_id=project_id, error=str(exc)[:200])
                 continue
             for row in rows:
                 window = "all"

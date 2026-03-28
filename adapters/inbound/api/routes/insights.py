@@ -3,6 +3,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from adapters.inbound.api.auth.headers import require_headers
+from core_ai.logging import get_logger
 from core_ai.contexts import AuthContext
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.insights import (
@@ -13,12 +14,12 @@ from adapters.inbound.api.schemas.insights import (
     InsightListResponse,
     SummaryResponse,
 )
-from adapters.outbound.observability.logging import log_event
 from adapters.outbound.observability.metrics import inc_counter, observe_ms
 
 router = APIRouter()
 ALLOWED_ACTIONS = {"ack", "acknowledged", "snooze", "snoozed", "resolved"}
 ALLOWED_NEW_STATUS = {"acknowledged", "snoozed", "resolved"}
+logger = get_logger("ponti-ai.insights")
 
 
 def _to_insight_item(insight) -> InsightItem:
@@ -64,22 +65,20 @@ def compute_insights(
         duration_ms = int((time.time() - started) * 1000)
         observe_ms("insights.compute.duration_ms", duration_ms)
         inc_counter("insights.compute.error", 1)
-        log_event("insights.compute.error", {"project_id": auth.tenant_id, "error": str(exc)[:200]})
+        logger.info("insights.compute.error", project_id=auth.tenant_id, error=str(exc)[:200])
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al computar insights")
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
     inc_counter("insights.compute.count", 1)
     inc_counter("insights.compute.rules_created", int(result.rules_insights_created))
-    log_event(
+    logger.info(
         "insights.compute",
-        {
-            "request_id": result.request_id,
-            "project_id": auth.tenant_id,
-            "computed": result.computed,
-            "created": result.insights_created,
-            "rules_created": int(result.rules_insights_created),
-            "status": "ok",
-        },
+        request_id=result.request_id,
+        project_id=auth.tenant_id,
+        computed=result.computed,
+        created=result.insights_created,
+        rules_created=int(result.rules_insights_created),
+        status="ok",
     )
     return ComputeInsightsResponse(
         request_id=result.request_id,
@@ -105,15 +104,13 @@ def get_insights(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.get.duration_ms", duration_ms)
     inc_counter("insights.get.count", 1)
-    log_event(
+    logger.info(
         "insights.get",
-        {
-            "project_id": auth.tenant_id,
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-            "count": len(items),
-            "status": "ok",
-        },
+        project_id=auth.tenant_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        count=len(items),
+        status="ok",
     )
     return InsightListResponse(insights=items)
 
@@ -129,14 +126,12 @@ def get_summary(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.summary.duration_ms", duration_ms)
     inc_counter("insights.summary.count", 1)
-    log_event(
+    logger.info(
         "insights.summary",
-        {
-            "project_id": auth.tenant_id,
-            "new_total": summary.new_count_total,
-            "new_high": summary.new_count_high_severity,
-            "status": "ok",
-        },
+        project_id=auth.tenant_id,
+        new_total=summary.new_count_total,
+        new_high=summary.new_count_high_severity,
+        status="ok",
     )
     return SummaryResponse(
         new_count_total=summary.new_count_total,
@@ -172,13 +167,11 @@ def record_action(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.action.duration_ms", duration_ms)
     inc_counter("insights.action.count", 1)
-    log_event(
+    logger.info(
         "insights.action",
-        {
-            "request_id": result.request_id,
-            "project_id": auth.tenant_id,
-            "insight_id": insight_id,
-            "status": "ok",
-        },
+        request_id=result.request_id,
+        project_id=auth.tenant_id,
+        insight_id=insight_id,
+        status="ok",
     )
     return ActionResponse(request_id=result.request_id, status="ok")
