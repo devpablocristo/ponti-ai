@@ -2,6 +2,13 @@
 
 Servicio FastAPI + PostgreSQL para calcular insights determinísticos y ofrecer explainability acotada por insight vía LLM.
 
+En la taxonomía canónica del ecosistema, Ponti AI combina:
+
+- `InsightService`
+- `CopilotAgent`
+
+No expone hoy un `ProductAgent` general, y eso es deliberado.
+
 ## Endpoints
 
 Siempre disponibles (sin auth):
@@ -9,13 +16,13 @@ Siempre disponibles (sin auth):
 - `GET /readyz`
 - `GET /metrics`
 
-Insights (requieren headers `X-SERVICE-KEY`, `X-USER-ID`, `X-PROJECT-ID`):
+InsightService (requieren headers `X-SERVICE-KEY`, `X-USER-ID`, `X-PROJECT-ID`):
 - `POST /v1/insights/compute`
 - `GET  /v1/insights/summary`
 - `GET  /v1/insights/{entity_type}/{entity_id}`
 - `POST /v1/insights/{insight_id}/actions` — solo `ack`, `snooze`, `resolved`
 
-Copilot (solo si `COPILOT_ENABLED=true`, mismos headers):
+CopilotAgent (solo si `COPILOT_ENABLED=true`, mismos headers):
 - `GET /v1/copilot/insights/{insight_id}/explain`
 - `GET /v1/copilot/insights/{insight_id}/why`
 - `GET /v1/copilot/insights/{insight_id}/next-steps`

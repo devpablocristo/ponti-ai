@@ -1,8 +1,10 @@
 import time
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from adapters.inbound.api.auth.headers import require_headers
+from app.runtime_contracts import OUTPUT_KIND_INSIGHT_SUMMARY, SERVICE_KIND_INSIGHT
 from core_ai.logging import get_logger
 from core_ai.contexts import AuthContext
 from adapters.inbound.api.dependencies import AppContainer, get_container
@@ -82,6 +84,7 @@ def compute_insights(
     )
     return ComputeInsightsResponse(
         request_id=result.request_id,
+        service_kind=SERVICE_KIND_INSIGHT,
         computed=result.computed,
         insights_created=result.insights_created,
     )
@@ -95,6 +98,7 @@ def get_insights(
     container: AppContainer = Depends(get_container),
 ) -> InsightListResponse:
     started = time.time()
+    request_id = str(uuid4())
     insights = container.get_insights.handle(
         project_id=auth.tenant_id,
         entity_type=entity_type,
@@ -106,13 +110,14 @@ def get_insights(
     inc_counter("insights.get.count", 1)
     logger.info(
         "insights.get",
+        request_id=request_id,
         project_id=auth.tenant_id,
         entity_type=entity_type,
         entity_id=entity_id,
         count=len(items),
         status="ok",
     )
-    return InsightListResponse(insights=items)
+    return InsightListResponse(request_id=request_id, service_kind=SERVICE_KIND_INSIGHT, insights=items)
 
 
 @router.get("/v1/insights/summary", response_model=SummaryResponse)
@@ -121,6 +126,7 @@ def get_summary(
     container: AppContainer = Depends(get_container),
 ) -> SummaryResponse:
     started = time.time()
+    request_id = str(uuid4())
     summary = container.get_summary.handle(project_id=auth.tenant_id)
     top_items = [_to_insight_item(insight) for insight in summary.top_insights]
     duration_ms = int((time.time() - started) * 1000)
@@ -128,12 +134,16 @@ def get_summary(
     inc_counter("insights.summary.count", 1)
     logger.info(
         "insights.summary",
+        request_id=request_id,
         project_id=auth.tenant_id,
         new_total=summary.new_count_total,
         new_high=summary.new_count_high_severity,
         status="ok",
     )
     return SummaryResponse(
+        request_id=request_id,
+        service_kind=SERVICE_KIND_INSIGHT,
+        output_kind=OUTPUT_KIND_INSIGHT_SUMMARY,
         new_count_total=summary.new_count_total,
         new_count_high_severity=summary.new_count_high_severity,
         top_insights=top_items,
@@ -174,4 +184,4 @@ def record_action(
         insight_id=insight_id,
         status="ok",
     )
-    return ActionResponse(request_id=result.request_id, status="ok")
+    return ActionResponse(request_id=result.request_id, service_kind=SERVICE_KIND_INSIGHT, status="ok")

@@ -90,7 +90,7 @@ def _fallback_explanation(*, insight: Insight, mode: CopilotExplainMode) -> dict
     mode_text: dict[CopilotExplainMode, str] = {
         "explain": "Explicacion operativa del insight",
         "why": "Motivo de negocio y evidencia principal",
-        "next_steps": "Siguientes pasos recomendados",
+        "next-steps": "Siguientes pasos recomendados",
     }
     base = f"{mode_text[mode]}: {insight.title}. {insight.summary}"
     return {

@@ -95,7 +95,7 @@ def test_copilot_explainer_fallbacks_when_llm_fails() -> None:
 
 def test_copilot_explainer_next_steps_mode() -> None:
     explainer = CopilotExplainerLLM(_FailingLLM())  # type: ignore[arg-type]
-    out = explainer.explain(insight=_make_insight(), proposal=None, mode="next_steps")
+    out = explainer.explain(insight=_make_insight(), proposal=None, mode="next-steps")
     assert "Siguientes pasos" in out["human_readable"]
 
 

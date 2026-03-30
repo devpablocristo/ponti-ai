@@ -6,6 +6,10 @@ from contexts.insights.application.ports.insight_repository import InsightReposi
 from contexts.insights.application.ports.proposal_store import ProposalStorePort
 
 
+class InsightNotFoundError(Exception):
+    pass
+
+
 class ExplainInsight:
     def __init__(
         self,
@@ -21,7 +25,7 @@ class ExplainInsight:
     def handle(self, *, project_id: str, insight_id: str, mode: CopilotExplainMode) -> dict[str, Any]:
         insight = self.insight_repo.get_by_id(project_id, insight_id)
         if insight is None:
-            raise KeyError("insight_not_found")
+            raise InsightNotFoundError("insight_not_found")
 
         proposal_row = self.proposal_store.get_latest_ok(insight_id)
         proposal = proposal_row.proposal if proposal_row else None

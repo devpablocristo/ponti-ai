@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from core_ai.completions import LLMRateLimitError
+from contexts.copilot.application.use_cases.explain_insight import InsightNotFoundError
 from app.main import create_app
 
 
@@ -81,3 +83,111 @@ def test_app_version(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     resp = client.get("/openapi.json")
     assert resp.status_code == 200
     assert resp.json()["info"]["version"] == "1.0.0-mvp"
+
+
+def test_openapi_exposes_shared_surface_metadata(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _set_base_env(monkeypatch)
+    monkeypatch.setenv("COPILOT_ENABLED", "true")
+
+    client = TestClient(create_app())
+    schema = client.get("/openapi.json").json()
+    schemas = schema["components"]["schemas"]
+
+    assert "request_id" in schemas["ExplainInsightResponse"]["properties"]
+    assert "output_kind" in schemas["ExplainInsightResponse"]["properties"]
+    assert "routing_source" in schemas["ExplainInsightResponse"]["properties"]
+    assert "service_kind" in schemas["ComputeInsightsResponse"]["properties"]
+    assert "request_id" in schemas["InsightListResponse"]["properties"]
+    assert "output_kind" in schemas["SummaryResponse"]["properties"]
+    assert "service_kind" in schemas["ActionResponse"]["properties"]
+
+
+def test_copilot_route_maps_rate_limit_to_stable_detail(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _set_base_env(monkeypatch)
+    monkeypatch.setenv("COPILOT_ENABLED", "true")
+
+    class _FailingExplain:
+        def handle(self, *, project_id: str, insight_id: str, mode: str):
+            _ = (project_id, insight_id, mode)
+            raise LLMRateLimitError("llm_global_rate_limit_exceeded")
+
+    app = create_app()
+    object.__setattr__(app.state.container, "explain_insight", _FailingExplain())
+    client = TestClient(app)
+
+    response = client.get(
+        "/v1/copilot/insights/abc/explain",
+        headers={
+            "X-SERVICE-KEY": "test-ai-service-key",
+            "X-USER-ID": "u-1",
+            "X-PROJECT-ID": "p-1",
+        },
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "copilot_rate_limited"
+
+
+def test_copilot_route_maps_not_found_explicitly(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _set_base_env(monkeypatch)
+    monkeypatch.setenv("COPILOT_ENABLED", "true")
+
+    class _MissingExplain:
+        def handle(self, *, project_id: str, insight_id: str, mode: str):
+            _ = (project_id, insight_id, mode)
+            raise InsightNotFoundError("insight_not_found")
+
+    app = create_app()
+    object.__setattr__(app.state.container, "explain_insight", _MissingExplain())
+    client = TestClient(app)
+
+    response = client.get(
+        "/v1/copilot/insights/abc/explain",
+        headers={
+            "X-SERVICE-KEY": "test-ai-service-key",
+            "X-USER-ID": "u-1",
+            "X-PROJECT-ID": "p-1",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Insight no encontrado"
+
+
+def test_copilot_route_returns_shared_surface_metadata(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _set_base_env(monkeypatch)
+    monkeypatch.setenv("COPILOT_ENABLED", "true")
+
+    class _ExplainOK:
+        def handle(self, *, project_id: str, insight_id: str, mode: str):
+            _ = project_id
+            return {
+                "insight_id": insight_id,
+                "mode": mode,
+                "explanation": {
+                    "human_readable": "Resumen",
+                    "audit_focused": "Auditoría",
+                    "what_to_watch_next": "Seguimiento",
+                },
+                "proposal": None,
+            }
+
+    app = create_app()
+    object.__setattr__(app.state.container, "explain_insight", _ExplainOK())
+    client = TestClient(app)
+
+    response = client.get(
+        "/v1/copilot/insights/abc/explain",
+        headers={
+            "X-SERVICE-KEY": "test-ai-service-key",
+            "X-USER-ID": "u-1",
+            "X-PROJECT-ID": "p-1",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["request_id"]
+    assert payload["output_kind"] == "copilot_explanation"
+    assert payload["routed_agent"] == "copilot"
+    assert payload["routing_source"] == "copilot_agent"
