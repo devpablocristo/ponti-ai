@@ -34,8 +34,8 @@ services:
 
   ponti-ai:
     build:
-      context: ../..
-      dockerfile: ./ponti/ponti-ai/Dockerfile.workspace
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       ai-db:
         condition: service_healthy
@@ -50,8 +50,8 @@ services:
 
   ai-test:
     build:
-      context: ../..
-      dockerfile: ./ponti/ponti-ai/Dockerfile.workspace
+      context: .
+      dockerfile: Dockerfile
     working_dir: /app
     environment:
       - PYTHONPATH=/app
