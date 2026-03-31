@@ -46,6 +46,31 @@ make test
 make smoke-local
 ```
 
+## Integración con frontend
+
+Ponti Frontend no consume contratos AI escritos a mano.
+
+- La fuente de verdad es el OpenAPI de Ponti AI.
+- El frontend genera `ui/src/generated/ponti-ai.openapi.json` y
+  `ui/src/generated/ponti-ai.openapi.ts` con
+  `ui/scripts/generate-ai-types.mjs`.
+- Los tipos estables consumibles por UI viven en `ui/src/types/ai.ts`.
+- Los widgets visuales reutilizables de insights/copilot se consumen desde
+  `@devpablocristo/modules-ai-console`.
+
+Si cambia el contrato HTTP de Ponti AI, regenerar tipos en el frontend:
+
+```bash
+cd ../ponti-frontend/ui
+node ./scripts/generate-ai-types.mjs
+```
+
+## Docker local
+
+El `docker-compose.yml` del servicio usa `context: .` y `Dockerfile` local.
+Ya no depende del layout padre ni de `Dockerfile.workspace` para el flujo
+principal de desarrollo.
+
 ## Configuración
 
 La config usa [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) con `env_ignore_empty=True`:

@@ -25,6 +25,9 @@ Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
 - **Hexagonal**: ports en `contexts/*/application/ports/`, adapters en `adapters/outbound/`.
 - **Config**: Pydantic Settings con `env_ignore_empty=True` (variables vacías usan defaults).
 - **LLM**: fail-open para propuesta/planning de insights; si falla esa capa, el cómputo determinístico sigue y la propuesta queda `status=error`.
+- **Consumo frontend**: el contrato OpenAPI se exporta y se transforma a tipos TS
+  consumidos por `ponti-frontend/ui/src/types/ai.ts`.
+- **UI reusable**: la consola de insights/copilot usa `@devpablocristo/modules-ai-console`.
 
 ## Endpoints públicos
 
