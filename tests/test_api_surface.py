@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from core_ai.completions import LLMRateLimitError
+from runtime.completions import LLMRateLimitError
 from contexts.copilot.application.use_cases.explain_insight import InsightNotFoundError
 from app.main import create_app
 

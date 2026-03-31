@@ -10,7 +10,7 @@ from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
 from adapters.outbound.db.repos.proposal_store_pg import ProposalStorePG
-from core_ai.completions import build_llm_client
+from runtime.completions import build_llm_client
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
 from adapters.outbound.llm.insight_planner import InsightPlannerLLM
 from adapters.outbound.models.anomaly_runner import AnomalyRunner

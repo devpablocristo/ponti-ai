@@ -1,7 +1,7 @@
-# Autenticación por headers de servicio. Produce un AuthContext de core_ai.
+# Autenticación por headers de servicio. Produce un AuthContext del runtime compartido.
 from fastapi import Header, HTTPException, status
 
-from core_ai.contexts import AuthContext
+from runtime.contexts import AuthContext
 
 from adapters.outbound.security.api_keys import is_valid_service_key
 

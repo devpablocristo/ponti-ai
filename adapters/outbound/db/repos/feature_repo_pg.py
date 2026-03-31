@@ -1,6 +1,6 @@
 import psycopg
 
-from core_ai.logging import get_logger
+from runtime.logging import get_logger
 from adapters.outbound.sql.catalog import list_feature_entries
 from adapters.outbound.sql.executor import SQLExecutor
 from contexts.insights.application.ports.feature_repository import FeatureRepositoryPort, FeatureValue

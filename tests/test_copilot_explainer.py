@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from core_ai.completions import (
+from runtime.completions import (
     LLMBudgetExceededError,
     LLMCompletion,
     LLMError,

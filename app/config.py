@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from core_ai.config.llm import resolve_model_name, validate_provider_api_key
+from runtime.config.llm import resolve_model_name, validate_provider_api_key
 
 
 class Settings(BaseSettings):

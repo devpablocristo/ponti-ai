@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from adapters.inbound.api.auth.headers import require_headers
 from app.runtime_contracts import OUTPUT_KIND_INSIGHT_SUMMARY, SERVICE_KIND_INSIGHT
-from core_ai.logging import get_logger
-from core_ai.contexts import AuthContext
+from runtime.contexts import AuthContext
+from runtime.logging import get_logger
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.insights import (
     ActionRequest,

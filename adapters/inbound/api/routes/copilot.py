@@ -3,8 +3,8 @@ from uuid import uuid4
 
 from adapters.inbound.api.auth.headers import require_headers
 from app.runtime_contracts import OUTPUT_KIND_COPILOT_EXPLANATION, ROUTING_SOURCE_COPILOT_AGENT
-from core_ai.contexts import AuthContext
-from core_ai.completions import LLMBudgetExceededError, LLMRateLimitError
+from runtime.completions import LLMBudgetExceededError, LLMRateLimitError
+from runtime.contexts import AuthContext
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.copilot import ExplainInsightResponse
 from contexts.copilot.application.use_cases.explain_insight import InsightNotFoundError

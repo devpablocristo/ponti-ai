@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from core_ai.completions import LLMBudgetExceededError, JSONCompletionClient as LLMClient, LLMError, LLMRateLimitError, validate_json_completion
+from runtime.completions import LLMBudgetExceededError, JSONCompletionClient as LLMClient, LLMError, LLMRateLimitError, validate_json_completion
 from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_PROMPT_VERSION,
     COPILOT_EXPLAIN_SYSTEM_PROMPT,

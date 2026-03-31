@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 try:
-    from core_ai import (
+    from runtime import (
         OUTPUT_KIND_COPILOT_EXPLANATION,
         OUTPUT_KIND_INSIGHT_SUMMARY,
         ROUTING_SOURCE_COPILOT_AGENT,
