@@ -71,6 +71,9 @@ El `docker-compose.yml` del servicio usa `context: .` y `Dockerfile` local.
 Ya no depende del layout padre ni de `Dockerfile.workspace` para el flujo
 principal de desarrollo.
 
+Además, `.dockerignore` excluye `.env`, caches Python y artefactos locales para
+achicar el contexto y reducir exposición accidental de archivos sensibles.
+
 ## Configuración
 
 La config usa [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) con `env_ignore_empty=True`:
