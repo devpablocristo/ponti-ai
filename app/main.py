@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from adapters.inbound.api.dependencies import AppContainer
+from adapters.inbound.api.routes.chat import router as chat_router
 from adapters.inbound.api.routes.copilot import router as copilot_router
 from adapters.inbound.api.routes.health import router as health_router
 from adapters.inbound.api.routes.insights import router as insights_router
@@ -10,6 +11,7 @@ from adapters.outbound.db.repos.baseline_repo_pg import BaselineRepositoryPG
 from adapters.outbound.db.repos.feature_repo_pg import FeatureRepositoryPG
 from adapters.outbound.db.repos.insight_repo_pg import InsightRepositoryPG
 from adapters.outbound.db.repos.proposal_store_pg import ProposalStorePG
+from adapters.outbound.llm.chat_provider_factory import build_chat_llm_provider
 from runtime.completions import build_llm_client
 from adapters.outbound.llm.copilot_explainer import CopilotExplainerLLM
 from adapters.outbound.llm.insight_planner import InsightPlannerLLM
@@ -34,6 +36,7 @@ def create_app() -> FastAPI:
     baseline_repo = BaselineRepositoryPG(settings)
 
     llm_client = build_llm_client(settings, logger_name="ponti-ai.llm")
+    chat_llm = build_chat_llm_provider(settings)
     insight_planner = InsightPlannerLLM(llm_client)
     copilot_explainer = CopilotExplainerLLM(llm_client)
 
@@ -78,12 +81,15 @@ def create_app() -> FastAPI:
         get_insights=get_insights,
         get_summary=get_summary,
         record_action=record_action,
+        chat_llm=chat_llm,
     )
 
     app = FastAPI(title="Ponti AI", version="1.0.0-mvp")
     app.state.container = container
     app.include_router(health_router)
     app.include_router(insights_router)
+    if settings.chat_enabled:
+        app.include_router(chat_router)
     if settings.copilot_enabled:
         app.include_router(copilot_router)
     return app

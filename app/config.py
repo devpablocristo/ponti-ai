@@ -32,6 +32,8 @@ class Settings(BaseSettings):
 
     # --- Copilot / LLM ---
     copilot_enabled: bool = True
+    # Habilita POST /v1/chat y listado de conversaciones (usa el mismo LLM_PROVIDER que el resto del servicio).
+    chat_enabled: bool = True
     llm_provider: str = "stub"
     llm_model: str | None = None
     llm_api_key: str | None = None

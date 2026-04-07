@@ -77,6 +77,8 @@ def main() -> int:
             call("POST /v1/insights/compute", "POST", "/v1/insights/compute", {}, auth=True),
             call("GET /v1/insights/summary", "GET", "/v1/insights/summary", auth=True),
             call("GET /v1/insights/project/1", "GET", "/v1/insights/project/1", auth=True),
+            call("POST /v1/chat", "POST", "/v1/chat", {"message": "hola"}, auth=True),
+            call("GET /v1/chat/conversations", "GET", "/v1/chat/conversations", auth=True),
             call("POST /v1/rag/ingest", "POST", "/v1/rag/ingest", {}, auth=True),
             call("GET /v1/ml/status", "GET", "/v1/ml/status", auth=True),
             call("POST /v1/jobs/recompute-active", "POST", "/v1/jobs/recompute-active", {}, auth=True),
@@ -97,9 +99,10 @@ def main() -> int:
                 or name.startswith("POST /v1/jobs")
             )
             is_insight = name.startswith("POST /v1/insights") or name.startswith("GET /v1/insights")
+            is_chat = name.startswith("POST /v1/chat") or name.startswith("GET /v1/chat")
             if expected_404:
                 status_ok = status_code == 404
-            elif is_insight and not strict_insights:
+            elif (is_insight or is_chat) and not strict_insights:
                 status_ok = ok(status_code) or status_code == 500
             else:
                 status_ok = ok(status_code)

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import Request
 
@@ -18,6 +19,8 @@ class AppContainer:
     get_insights: GetInsights
     get_summary: GetSummary
     record_action: RecordAction
+    # Proveedor con `chat()` para el asistente conversacional (puede diferir del cliente JSON del copilot).
+    chat_llm: Any
 
 
 def get_container(request: Request) -> AppContainer:
