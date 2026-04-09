@@ -59,6 +59,18 @@ class Settings(BaseSettings):
     domain: str = "agriculture"
     max_actions_allowed: int = 4
 
+    # --- Ponti backend (lecturas para tools del chat; opcional) ---
+    ponti_backend_base_url: str | None = None
+    ponti_backend_api_key: str | None = None
+    ponti_backend_timeout_ms: int = 15000
+    ponti_backend_max_response_chars: int = 16000
+    # Opcional: cabecera Authorization completa (p.ej. Bearer …) si el backend lo exige en prod.
+    ponti_backend_authorization: str | None = None
+    # Máximo de invocaciones a tools por turno de chat (cada tool cuenta una vez por ronda del orquestador).
+    chat_max_tool_calls: int = 14
+    chat_project_context_ttl_seconds: int = 900
+    chat_dashboard_context_ttl_seconds: int = 600
+
     # -- Guards: clamp mínimos para evitar valores absurdos --
 
     @field_validator("llm_timeout_ms")
@@ -95,6 +107,26 @@ class Settings(BaseSettings):
     @classmethod
     def _clamp_max_actions(cls, v: int) -> int:
         return max(0, v)
+
+    @field_validator("ponti_backend_timeout_ms")
+    @classmethod
+    def _clamp_backend_timeout(cls, v: int) -> int:
+        return max(500, v)
+
+    @field_validator("ponti_backend_max_response_chars")
+    @classmethod
+    def _clamp_backend_json(cls, v: int) -> int:
+        return max(2000, v)
+
+    @field_validator("chat_max_tool_calls")
+    @classmethod
+    def _clamp_chat_tools(cls, v: int) -> int:
+        return max(1, min(v, 40))
+
+    @field_validator("chat_project_context_ttl_seconds", "chat_dashboard_context_ttl_seconds")
+    @classmethod
+    def _clamp_context_ttl(cls, v: int) -> int:
+        return max(60, min(v, 86_400))
 
     # -- Validaciones post-init --
 

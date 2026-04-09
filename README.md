@@ -6,8 +6,9 @@ En la taxonomía canónica del ecosistema, Ponti AI combina:
 
 - `InsightService`
 - `CopilotAgent`
+- `Project Advisor`
 
-No expone hoy un `ProductAgent` general, y eso es deliberado.
+No expone un `ProductAgent` horizontal genérico. Expone un asesor de proyecto específico al dominio agrícola y al modelo operativo de Ponti.
 
 ## Endpoints
 
@@ -26,6 +27,12 @@ CopilotAgent (solo si `COPILOT_ENABLED=true`, mismos headers):
 - `GET /v1/copilot/insights/{insight_id}/explain`
 - `GET /v1/copilot/insights/{insight_id}/why`
 - `GET /v1/copilot/insights/{insight_id}/next-steps`
+
+Project Advisor / chat (mismos headers):
+- `POST /v1/chat`
+- `POST /v1/chat/stream`
+- `GET  /v1/chat/conversations`
+- `GET  /v1/chat/conversations/{conversation_id}`
 
 ## Quickstart
 

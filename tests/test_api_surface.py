@@ -81,6 +81,7 @@ def test_chat_endpoints_require_auth(monkeypatch) -> None:  # type: ignore[no-un
 
     client = TestClient(create_app())
     assert client.post("/v1/chat", json={"message": "hola"}).status_code == 401
+    assert client.post("/v1/chat/stream", json={"message": "hola"}).status_code == 401
     assert client.get("/v1/chat/conversations").status_code == 401
     assert client.get("/v1/chat/conversations/00000000-0000-4000-8000-000000000001").status_code == 401
 
@@ -91,6 +92,7 @@ def test_chat_routes_not_mounted_when_disabled(monkeypatch) -> None:  # type: ig
 
     client = TestClient(create_app())
     assert client.post("/v1/chat", json={"message": "hola"}).status_code == 404
+    assert client.post("/v1/chat/stream", json={"message": "hola"}).status_code == 404
 
 
 def test_app_version(monkeypatch) -> None:  # type: ignore[no-untyped-def]
