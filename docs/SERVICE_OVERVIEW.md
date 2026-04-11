@@ -6,28 +6,31 @@ En la taxonomía canónica del ecosistema, Ponti AI se expresa como:
 
 - `InsightService`
 - `CopilotAgent`
+- `Project Advisor`
 
-No modela hoy un `ProductAgent` general, y eso es intencional.
+No modela un `ProductAgent` horizontal genérico. Modela un asesor de proyecto específico al dominio agrícola y al software Ponti.
 
 Ponti AI es una API FastAPI que:
 1. Calcula **insights determinísticos**: compara features de un proyecto contra baselines (percentiles p75/p90) y detecta spikes temporales.
 2. Ofrece **explainability acotada por insight** vía LLM (`CopilotAgent`), con propuestas no vinculantes y explicaciones en 3 modos.
-3. Persiste resultados técnicos en tablas `ai_*` para seguimiento operativo.
+3. Expone un chat de asesoría operativa por proyecto, con memoria persistente, contexto del proyecto y routing por módulos.
+4. Persiste resultados técnicos y contexto operativo en tablas `ai_*` para seguimiento.
 
 ## Arquitectura
 
 ```
-Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
-                                                       ↓
-                                              Adapters (DB, LLM, SQL)
+Cliente → FastAPI (src/api) → Services (src/agents, src/insights, src/copilot)
+                                            ↓
+                                  Repositories + LLM clients (src/db, src/tools)
 ```
 
-- **Hexagonal**: ports en `contexts/*/application/ports/`, adapters en `adapters/outbound/`.
+- **Estructura**: estilo Pymes en `src/` (sin ports/adapters explícitos). Ver `AI_EVOLUTION.md` §8 para el layout completo.
 - **Config**: Pydantic Settings con `env_ignore_empty=True` (variables vacías usan defaults).
 - **LLM**: fail-open para propuesta/planning de insights; si falla esa capa, el cómputo determinístico sigue y la propuesta queda `status=error`.
 - **Consumo frontend**: el contrato OpenAPI se exporta y se transforma a tipos TS
   consumidos por `ponti-frontend/ui/src/types/ai.ts`.
 - **UI reusable**: la consola de insights/copilot usa `@devpablocristo/modules-ai-console`.
+- **Chat advisor**: el asesor hidrata un dossier por proyecto, usa memoria operativa reusable desde `core-ai` y enriquece el prompt con contexto agrícola/Ponti.
 
 ## Endpoints públicos
 
@@ -70,6 +73,15 @@ Cada endpoint de `CopilotAgent` devuelve:
 }
 ```
 
+### Project Advisor / chat
+
+| Método | Path | Descripción |
+|---|---|---|
+| POST | `/v1/chat` | Turno de chat con respuesta compacta |
+| POST | `/v1/chat/stream` | Turno de chat en SSE |
+| GET | `/v1/chat/conversations` | Lista de conversaciones del usuario |
+| GET | `/v1/chat/conversations/{conversation_id}` | Conversación persistida |
+
 ## Tablas
 
 | Tabla | Descripción |
@@ -79,6 +91,8 @@ Cada endpoint de `CopilotAgent` devuelve:
 | `ai_insight_actions` | Acciones humanas sobre insights |
 | `ai_baselines` | Baselines estadísticos (p50/p75/p90) |
 | `ai_insight_proposals` | Propuestas LLM por insight |
+| `ai_conversations` | Conversaciones del asesor |
+| `ai_project_dossiers` | Contexto persistente y memoria por proyecto |
 
 ## Variables de entorno
 

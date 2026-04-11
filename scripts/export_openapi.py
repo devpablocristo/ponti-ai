@@ -10,7 +10,7 @@ def main() -> int:
     if str(ai_root) not in sys.path:
         sys.path.insert(0, str(ai_root))
 
-    from app.main import create_app
+    from src.main import create_app
 
     schema = create_app().openapi()
     output_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None

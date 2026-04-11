@@ -140,3 +140,28 @@ Ver `.env.example` para la lista completa de variables y defaults.
 - **LLM**: Stub (local) / Ollama / OpenAI / Google AI Studio
 - **Config**: Pydantic Settings (`env_ignore_empty=True`)
 - **Migraciones**: golang-migrate
+
+
+## Ollama Compartido Local
+
+`ponti-ai` consume el stack compartido de Ollama en `/home/pablo/Projects/Pablo/local-infra/ollama`.
+
+```bash
+cd /home/pablo/Projects/Pablo/local-infra/ollama
+docker compose up -d
+docker compose exec -T ollama ollama pull gemma4:e4b
+```
+
+Atajos:
+
+```bash
+make llm-up
+make llm-pull
+```
+
+Configuración local:
+
+```env
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://host.docker.internal:11434
+```
