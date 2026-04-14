@@ -31,7 +31,7 @@ class PontiStubChatProvider:
         text = (
             "Modo stub (sin modelo generativo). Recibí tu mensaje"
             + (f": «{snippet}»" if snippet else "")
-            + ". Configurá LLM_PROVIDER=gemini|ollama y credenciales para respuestas reales."
+            + ". Configurá LLM_PROVIDER=vertex|gemini|ollama y credenciales para respuestas reales."
         )
         yield ChatChunk(type="text", text=text)
 
@@ -51,6 +51,16 @@ def build_chat_llm_provider(settings: Any) -> LLMProvider:
             return PontiStubChatProvider()
         model = str(getattr(settings, "llm_model", "") or "").strip() or "gemini-2.0-flash"
         return GeminiProvider(api_key=api_key, model=model)
+
+    if provider in {"vertex", "vertex_ai"}:
+        from runtime.providers.gemini import GeminiProvider
+
+        project = str(getattr(settings, "llm_project", "") or "").strip()
+        if not project:
+            return PontiStubChatProvider()
+        location = str(getattr(settings, "llm_location", "") or "").strip() or "us-central1"
+        model = str(getattr(settings, "llm_model", "") or "").strip() or "gemini-2.0-flash"
+        return GeminiProvider(vertex_project=project, vertex_location=location, model=model)
 
     if provider == "ollama":
         from runtime.providers.ollama import OllamaProvider

@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     llm_model: str | None = None
     llm_api_key: str | None = None
     llm_base_url: str | None = None
+    llm_project: str | None = None
+    llm_location: str | None = None
     llm_timeout_ms: int = 5000
     llm_max_retries: int = 3
     llm_max_output_tokens: int = 700
