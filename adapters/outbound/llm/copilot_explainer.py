@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from adapters.outbound.llm.client import LLMBudgetExceededError, LLMClient, LLMError, LLMRateLimitError
+from runtime.completions import LLMBudgetExceededError, JSONCompletionClient as LLMClient, LLMError, LLMRateLimitError, validate_json_completion
 from adapters.outbound.llm.prompts import (
     COPILOT_EXPLAIN_PROMPT_VERSION,
     COPILOT_EXPLAIN_SYSTEM_PROMPT,
@@ -42,8 +42,7 @@ class CopilotExplainerLLM(CopilotExplainerPort):
         )
         try:
             completion = self.llm.complete_json(system_prompt=COPILOT_EXPLAIN_SYSTEM_PROMPT, user_prompt=user_prompt)
-            payload = json.loads(completion.content)
-            out = _ExplainOut.model_validate(payload)
+            out = validate_json_completion(completion.content, _ExplainOut)
             return out.model_dump()
         except (LLMRateLimitError, LLMBudgetExceededError):
             raise
@@ -91,7 +90,7 @@ def _fallback_explanation(*, insight: Insight, mode: CopilotExplainMode) -> dict
     mode_text: dict[CopilotExplainMode, str] = {
         "explain": "Explicacion operativa del insight",
         "why": "Motivo de negocio y evidencia principal",
-        "next_steps": "Siguientes pasos recomendados",
+        "next-steps": "Siguientes pasos recomendados",
     }
     base = f"{mode_text[mode]}: {insight.title}. {insight.summary}"
     return {

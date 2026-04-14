@@ -1,15 +1,9 @@
-from dataclasses import dataclass
-
+# Autenticación por headers de servicio. Produce un AuthContext del runtime compartido.
 from fastapi import Header, HTTPException, status
 
+from runtime.contexts import AuthContext
+
 from adapters.outbound.security.api_keys import is_valid_service_key
-
-
-@dataclass(frozen=True)
-class AuthContext:
-    api_key: str
-    user_id: str
-    project_id: str
 
 
 def require_headers(
@@ -25,4 +19,10 @@ def require_headers(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="X-PROJECT-ID requerido")
     if not is_valid_service_key(x_service_key):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Service key invalida")
-    return AuthContext(api_key=x_service_key, user_id=x_user_id, project_id=x_project_id)
+    return AuthContext(
+        tenant_id=x_project_id,
+        actor=x_user_id,
+        role="service",
+        scopes=[],
+        mode="api_key",
+    )

@@ -3,7 +3,7 @@ from typing import Any, Literal, Protocol
 from contexts.insights.domain.entities import Insight
 
 
-CopilotExplainMode = Literal["explain", "why", "next_steps"]
+CopilotExplainMode = Literal["explain", "why", "next-steps"]
 
 
 class CopilotExplainerPort(Protocol):

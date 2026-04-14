@@ -2,9 +2,16 @@
 
 ## Qué es
 
+En la taxonomía canónica del ecosistema, Ponti AI se expresa como:
+
+- `InsightService`
+- `CopilotAgent`
+
+No modela hoy un `ProductAgent` general, y eso es intencional.
+
 Ponti AI es una API FastAPI que:
 1. Calcula **insights determinísticos**: compara features de un proyecto contra baselines (percentiles p75/p90) y detecta spikes temporales.
-2. Ofrece **explainability acotada por insight** vía LLM (copilot), con propuestas no vinculantes y explicaciones en 3 modos.
+2. Ofrece **explainability acotada por insight** vía LLM (`CopilotAgent`), con propuestas no vinculantes y explicaciones en 3 modos.
 3. Persiste resultados técnicos en tablas `ai_*` para seguimiento operativo.
 
 ## Arquitectura
@@ -17,7 +24,10 @@ Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
 
 - **Hexagonal**: ports en `contexts/*/application/ports/`, adapters en `adapters/outbound/`.
 - **Config**: Pydantic Settings con `env_ignore_empty=True` (variables vacías usan defaults).
-- **LLM**: fail-open — si falla, core sigue y la propuesta queda `status=error`.
+- **LLM**: fail-open para propuesta/planning de insights; si falla esa capa, el cómputo determinístico sigue y la propuesta queda `status=error`.
+- **Consumo frontend**: el contrato OpenAPI se exporta y se transforma a tipos TS
+  consumidos por `ponti-frontend/ui/src/types/ai.ts`.
+- **UI reusable**: la consola de insights/copilot usa `@devpablocristo/modules-ai-console`.
 
 ## Endpoints públicos
 
@@ -29,7 +39,7 @@ Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
 | GET | `/readyz` | Readiness check (verifica DB) |
 | GET | `/metrics` | Contadores y timers in-memory |
 
-### Insights (requieren `X-SERVICE-KEY`, `X-USER-ID`, `X-PROJECT-ID`)
+### InsightService (requiere `X-SERVICE-KEY`, `X-USER-ID`, `X-PROJECT-ID`)
 
 | Método | Path | Descripción |
 |---|---|---|
@@ -38,7 +48,7 @@ Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
 | GET | `/v1/insights/{entity_type}/{entity_id}` | Lista insights por entidad |
 | POST | `/v1/insights/{insight_id}/actions` | Registra acción humana (ack/snooze/resolved) |
 
-### Copilot (solo si `COPILOT_ENABLED=true`)
+### CopilotAgent (solo si `COPILOT_ENABLED=true`)
 
 | Método | Path | Descripción |
 |---|---|---|
@@ -46,11 +56,11 @@ Cliente → FastAPI (routes) → Use Cases (domain) → Ports (interfaces)
 | GET | `/v1/copilot/insights/{insight_id}/why` | Motivo de negocio |
 | GET | `/v1/copilot/insights/{insight_id}/next-steps` | Siguientes pasos |
 
-Cada endpoint de copilot devuelve:
+Cada endpoint de `CopilotAgent` devuelve:
 ```json
 {
   "insight_id": "...",
-  "mode": "explain|why|next_steps",
+  "mode": "explain|why|next-steps",
   "explanation": {
     "human_readable": "...",
     "audit_focused": "...",
@@ -83,7 +93,7 @@ Cada endpoint de copilot devuelve:
 | `COPILOT_ENABLED` | `true` | Kill switch |
 | `LLM_PROVIDER` | `stub` | `stub`/`ollama`/`openai`/`google_ai_studio` |
 | `LLM_MODEL` | auto | Se resuelve por provider si está vacío |
-| `LLM_API_KEY` | `None` | Requerida si copilot=true y provider!=stub |
+| `LLM_API_KEY` | `None` | Requerida si `COPILOT_ENABLED=true` y `LLM_PROVIDER!=stub` |
 | `LLM_TIMEOUT_MS` | `5000` | Min: 1 |
 | `LLM_MAX_RETRIES` | `3` | Min: 1 |
 | `LLM_MAX_OUTPUT_TOKENS` | `700` | Min: 1 |

@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from app.runtime_contracts import OUTPUT_KIND_INSIGHT_SUMMARY, SERVICE_KIND_INSIGHT
 
 
 class InsightItem(BaseModel):
@@ -34,15 +35,21 @@ class InsightItem(BaseModel):
 
 class ComputeInsightsResponse(BaseModel):
     request_id: str
+    service_kind: Literal["insight_service"] = SERVICE_KIND_INSIGHT
     computed: int
     insights_created: int
 
 
 class InsightListResponse(BaseModel):
+    request_id: str
+    service_kind: Literal["insight_service"] = SERVICE_KIND_INSIGHT
     insights: list[InsightItem]
 
 
 class SummaryResponse(BaseModel):
+    request_id: str
+    service_kind: Literal["insight_service"] = SERVICE_KIND_INSIGHT
+    output_kind: Literal["insight_summary"] = OUTPUT_KIND_INSIGHT_SUMMARY
     new_count_total: int
     new_count_high_severity: int
     top_insights: list[InsightItem]
@@ -55,6 +62,7 @@ class ActionRequest(BaseModel):
 
 class ActionResponse(BaseModel):
     request_id: str
+    service_kind: Literal["insight_service"] = SERVICE_KIND_INSIGHT
     status: str
 
 

@@ -23,4 +23,6 @@ def test_auth_valid_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_SERVICE_KEYS", "k1,k2")
     api_keys._load_keys.cache_clear()
     ctx = require_headers(x_service_key="k1", x_user_id="1", x_project_id="p1")
-    assert ctx.project_id == "p1"
+    assert ctx.tenant_id == "p1"
+    assert ctx.actor == "1"
+    assert ctx.mode == "api_key"

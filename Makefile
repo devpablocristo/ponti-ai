@@ -23,9 +23,10 @@ migrate:
 	$(COMPOSE) run --rm ai-migrate
 
 run:
-	uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
+	PYTHONPATH=. uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
 
 test:
+	python -m pip install -r requirements.txt
 	PYTHONPATH=. python -m pytest
 
 pull-ollama-models:

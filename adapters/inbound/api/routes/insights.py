@@ -1,8 +1,12 @@
 import time
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from adapters.inbound.api.auth.headers import AuthContext, require_headers
+from adapters.inbound.api.auth.headers import require_headers
+from app.runtime_contracts import OUTPUT_KIND_INSIGHT_SUMMARY, SERVICE_KIND_INSIGHT
+from runtime.contexts import AuthContext
+from runtime.logging import get_logger
 from adapters.inbound.api.dependencies import AppContainer, get_container
 from adapters.inbound.api.schemas.insights import (
     ActionRequest,
@@ -12,12 +16,12 @@ from adapters.inbound.api.schemas.insights import (
     InsightListResponse,
     SummaryResponse,
 )
-from adapters.outbound.observability.logging import log_event
 from adapters.outbound.observability.metrics import inc_counter, observe_ms
 
 router = APIRouter()
 ALLOWED_ACTIONS = {"ack", "acknowledged", "snooze", "snoozed", "resolved"}
 ALLOWED_NEW_STATUS = {"acknowledged", "snoozed", "resolved"}
+logger = get_logger("ponti-ai.insights")
 
 
 def _to_insight_item(insight) -> InsightItem:
@@ -58,30 +62,29 @@ def compute_insights(
 ) -> ComputeInsightsResponse:
     started = time.time()
     try:
-        result = container.compute_insights.handle(project_id=auth.project_id, user_id=auth.user_id)
+        result = container.compute_insights.handle(project_id=auth.tenant_id, user_id=auth.actor)
     except Exception as exc:
         duration_ms = int((time.time() - started) * 1000)
         observe_ms("insights.compute.duration_ms", duration_ms)
         inc_counter("insights.compute.error", 1)
-        log_event("insights.compute.error", {"project_id": auth.project_id, "error": str(exc)[:200]})
+        logger.info("insights.compute.error", project_id=auth.tenant_id, error=str(exc)[:200])
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al computar insights")
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.compute.duration_ms", duration_ms)
     inc_counter("insights.compute.count", 1)
     inc_counter("insights.compute.rules_created", int(result.rules_insights_created))
-    log_event(
+    logger.info(
         "insights.compute",
-        {
-            "request_id": result.request_id,
-            "project_id": auth.project_id,
-            "computed": result.computed,
-            "created": result.insights_created,
-            "rules_created": int(result.rules_insights_created),
-            "status": "ok",
-        },
+        request_id=result.request_id,
+        project_id=auth.tenant_id,
+        computed=result.computed,
+        created=result.insights_created,
+        rules_created=int(result.rules_insights_created),
+        status="ok",
     )
     return ComputeInsightsResponse(
         request_id=result.request_id,
+        service_kind=SERVICE_KIND_INSIGHT,
         computed=result.computed,
         insights_created=result.insights_created,
     )
@@ -95,8 +98,9 @@ def get_insights(
     container: AppContainer = Depends(get_container),
 ) -> InsightListResponse:
     started = time.time()
+    request_id = str(uuid4())
     insights = container.get_insights.handle(
-        project_id=auth.project_id,
+        project_id=auth.tenant_id,
         entity_type=entity_type,
         entity_id=entity_id,
     )
@@ -104,17 +108,16 @@ def get_insights(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.get.duration_ms", duration_ms)
     inc_counter("insights.get.count", 1)
-    log_event(
+    logger.info(
         "insights.get",
-        {
-            "project_id": auth.project_id,
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-            "count": len(items),
-            "status": "ok",
-        },
+        request_id=request_id,
+        project_id=auth.tenant_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        count=len(items),
+        status="ok",
     )
-    return InsightListResponse(insights=items)
+    return InsightListResponse(request_id=request_id, service_kind=SERVICE_KIND_INSIGHT, insights=items)
 
 
 @router.get("/v1/insights/summary", response_model=SummaryResponse)
@@ -123,21 +126,24 @@ def get_summary(
     container: AppContainer = Depends(get_container),
 ) -> SummaryResponse:
     started = time.time()
-    summary = container.get_summary.handle(project_id=auth.project_id)
+    request_id = str(uuid4())
+    summary = container.get_summary.handle(project_id=auth.tenant_id)
     top_items = [_to_insight_item(insight) for insight in summary.top_insights]
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.summary.duration_ms", duration_ms)
     inc_counter("insights.summary.count", 1)
-    log_event(
+    logger.info(
         "insights.summary",
-        {
-            "project_id": auth.project_id,
-            "new_total": summary.new_count_total,
-            "new_high": summary.new_count_high_severity,
-            "status": "ok",
-        },
+        request_id=request_id,
+        project_id=auth.tenant_id,
+        new_total=summary.new_count_total,
+        new_high=summary.new_count_high_severity,
+        status="ok",
     )
     return SummaryResponse(
+        request_id=request_id,
+        service_kind=SERVICE_KIND_INSIGHT,
+        output_kind=OUTPUT_KIND_INSIGHT_SUMMARY,
         new_count_total=summary.new_count_total,
         new_count_high_severity=summary.new_count_high_severity,
         top_insights=top_items,
@@ -159,8 +165,8 @@ def record_action(
     try:
         result = container.record_action.handle(
             insight_id=insight_id,
-            project_id=auth.project_id,
-            user_id=auth.user_id,
+            project_id=auth.tenant_id,
+            user_id=auth.actor,
             action=req.action,
             new_status=req.new_status,
         )
@@ -171,13 +177,11 @@ def record_action(
     duration_ms = int((time.time() - started) * 1000)
     observe_ms("insights.action.duration_ms", duration_ms)
     inc_counter("insights.action.count", 1)
-    log_event(
+    logger.info(
         "insights.action",
-        {
-            "request_id": result.request_id,
-            "project_id": auth.project_id,
-            "insight_id": insight_id,
-            "status": "ok",
-        },
+        request_id=result.request_id,
+        project_id=auth.tenant_id,
+        insight_id=insight_id,
+        status="ok",
     )
-    return ActionResponse(request_id=result.request_id, status="ok")
+    return ActionResponse(request_id=result.request_id, service_kind=SERVICE_KIND_INSIGHT, status="ok")

@@ -5,6 +5,10 @@ on:
     branches: [develop, main]
   workflow_dispatch:
 
+concurrency:
+  group: ponti-ai-ci-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -13,12 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements.txt
 
@@ -33,3 +37,5 @@ jobs:
         run: |
           python -m pytest
 
+      - name: Build Docker image
+        run: docker build -t ponti-ai-ci-check .

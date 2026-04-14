@@ -1,3 +1,5 @@
+devpablocristo-httpserver==0.2.0
+devpablocristo-core-ai==0.3.0
 fastapi
 uvicorn
 pydantic
