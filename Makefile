@@ -5,7 +5,7 @@ COMPOSE ?= docker compose
 
 .PHONY: install up down build migrate run test pull-ollama-models llm-up llm-pull smoke smoke-local
 
-LOCAL_OLLAMA_DIR ?= /home/pablo/Projects/Pablo/local-infra/ollama
+LOCAL_INFRA_DIR ?= /home/pablo/Projects/Pablo/local-infra
 
 install:
 	python -m pip install -r requirements.txt
@@ -33,10 +33,10 @@ test:
 	PYTHONPATH=. python -m pytest
 
 llm-up:
-	cd $(LOCAL_OLLAMA_DIR) && docker compose up -d
+	docker compose --project-directory $(LOCAL_INFRA_DIR) -f $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml up -d
 
 llm-pull:
-	cd $(LOCAL_OLLAMA_DIR) && ./scripts/pull-model.sh gemma4:e4b
+	$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh gemma4:e4b
 
 pull-ollama-models: llm-pull
 

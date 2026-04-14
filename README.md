@@ -144,12 +144,11 @@ Ver `.env.example` para la lista completa de variables y defaults.
 
 ## Ollama Compartido Local
 
-`ponti-ai` consume el stack compartido de Ollama en `/home/pablo/Projects/Pablo/local-infra/ollama`.
+`ponti-ai` consume el stack compartido de Ollama desde `local-infra/docker-compose.ollama.yml`.
 
 ```bash
-cd /home/pablo/Projects/Pablo/local-infra/ollama
-docker compose up -d
-docker compose exec -T ollama ollama pull gemma4:e4b
+docker compose --project-directory /home/pablo/Projects/Pablo/local-infra -f /home/pablo/Projects/Pablo/local-infra/docker-compose.ollama.yml up -d
+/home/pablo/Projects/Pablo/local-infra/scripts/pull-ollama-model.sh gemma4:e4b
 ```
 
 Atajos:
