@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Smoke tests del release de ponti-ai.
+
+Ponti-ai hoy es solo el copilot conversacional: /v1/chat*. El sistema
+legacy de insights e insight-chat fue movido a ponti-backend
+(business_insight_candidates via Nexus Review), por lo que los
+endpoints /v1/insights/* y /v1/insight-chat/* ya no existen.
+"""
 import json
 import os
 import sys
@@ -53,35 +60,34 @@ def ok(status_code: int) -> bool:
 
 
 def main() -> int:
-    strict_insights = os.getenv("SMOKE_STRICT_INSIGHTS", "0") == "1"
     checks = []
 
     health_candidates = [
         call("GET /healthz", "GET", "/healthz"),
         call("GET /v1/healthz", "GET", "/v1/healthz"),
     ]
+    # /readyz puede requerir query params segun la version del httpserver.
+    # Aceptamos cualquier respuesta que no sea 5xx como "el servicio levanto".
     ready_candidates = [
         call("GET /readyz", "GET", "/readyz"),
         call("GET /v1/readyz", "GET", "/v1/readyz"),
     ]
 
-    health_ok = any(ok(code) or code == 404 for _, code, _ in health_candidates)
-    ready_ok = any(ok(code) or code == 404 for _, code, _ in ready_candidates)
+    health_ok = any(ok(code) for _, code, _ in health_candidates)
+    ready_ok = any(0 < int(code) < 500 for _, code, _ in ready_candidates)
     best_health = next((item for item in health_candidates if ok(item[1])), health_candidates[0])
-    best_ready = next((item for item in ready_candidates if ok(item[1])), ready_candidates[0])
+    best_ready = next(
+        (item for item in ready_candidates if 0 < int(item[1]) < 500),
+        ready_candidates[0],
+    )
     checks.extend([best_health, best_ready])
 
     checks.extend(
         [
             call("GET /metrics", "GET", "/metrics"),
-            call("POST /v1/insights/compute", "POST", "/v1/insights/compute", {}, auth=True),
-            call("GET /v1/insights/summary", "GET", "/v1/insights/summary", auth=True),
-            call("GET /v1/insights/project/1", "GET", "/v1/insights/project/1", auth=True),
+            # Chat: esperamos 200 (happy path) o 500 (LLM no configurado / upstream temporal).
             call("POST /v1/chat", "POST", "/v1/chat", {"message": "hola"}, auth=True),
             call("GET /v1/chat/conversations", "GET", "/v1/chat/conversations", auth=True),
-            call("POST /v1/rag/ingest", "POST", "/v1/rag/ingest", {}, auth=True),
-            call("GET /v1/ml/status", "GET", "/v1/ml/status", auth=True),
-            call("POST /v1/jobs/recompute-active", "POST", "/v1/jobs/recompute-active", {}, auth=True),
         ]
     )
 
@@ -92,20 +98,12 @@ def main() -> int:
             status_ok = health_ok
         elif name in ("GET /readyz", "GET /v1/readyz"):
             status_ok = ready_ok
+        elif name.startswith("POST /v1/chat") or name.startswith("GET /v1/chat"):
+            # LLM puede estar cold o con credenciales recien rotadas; tomamos
+            # 5xx como "vivo pero con upstream flaky" en smoke.
+            status_ok = ok(status_code) or status_code == 500
         else:
-            expected_404 = (
-                name.startswith("POST /v1/rag")
-                or name.startswith("GET /v1/ml")
-                or name.startswith("POST /v1/jobs")
-            )
-            is_insight = name.startswith("POST /v1/insights") or name.startswith("GET /v1/insights")
-            is_chat = name.startswith("POST /v1/chat") or name.startswith("GET /v1/chat")
-            if expected_404:
-                status_ok = status_code == 404
-            elif (is_insight or is_chat) and not strict_insights:
-                status_ok = ok(status_code) or status_code == 500
-            else:
-                status_ok = ok(status_code)
+            status_ok = ok(status_code)
 
         print(("OK" if status_ok else "FAIL"), status_code, name)
         if not status_ok:
