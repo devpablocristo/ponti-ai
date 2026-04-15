@@ -35,6 +35,12 @@ services:
     # Evitar hardcodear keys/URLs/proveedores acá.
     env_file:
       - ./.env
+    environment:
+      # Para LLM_PROVIDER=vertex: reusar ADC del host
+      # (requiere `gcloud auth application-default login` en el host).
+      GOOGLE_APPLICATION_CREDENTIALS: /root/.config/gcloud/application_default_credentials.json
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     ports:
       - "8090:8090"
     extra_hosts:

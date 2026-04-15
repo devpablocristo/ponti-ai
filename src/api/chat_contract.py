@@ -62,6 +62,19 @@ class ChatHandoff(BaseModel):
     )
 
 
+class WorkspaceContext(BaseModel):
+    """Filtros activos del workspace en la UI cuando el usuario envía el turno."""
+
+    customer_id: int | None = None
+    customer_name: str | None = None
+    project_id: int | None = None
+    project_name: str | None = None
+    campaign_id: int | None = None
+    campaign_name: str | None = None
+    field_id: int | None = None
+    field_name: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=12000)
     chat_id: str | None = Field(default=None, max_length=40)
@@ -75,6 +88,10 @@ class ChatRequest(BaseModel):
     )
     preferred_language: Literal["es", "en"] | None = None
     confirmed_actions: list[str] = Field(default_factory=list)
+    workspace: WorkspaceContext | None = Field(
+        default=None,
+        description="Selección activa del usuario (cliente/proyecto/campaña/campo).",
+    )
 
 
 class ChatResponse(BaseModel):
