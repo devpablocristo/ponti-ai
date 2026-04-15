@@ -1,0 +1,37 @@
+"""Compatibilidad local para contratos compartidos de AI."""
+
+from __future__ import annotations
+
+try:
+    from runtime import (
+        OUTPUT_KIND_COPILOT_EXPLANATION,
+        OUTPUT_KIND_INSIGHT_SUMMARY,
+        ROUTING_SOURCE_COPILOT_AGENT,
+        ROUTING_SOURCE_ORCHESTRATOR,
+        ROUTING_SOURCE_READ_FALLBACK,
+        ROUTING_SOURCE_UI_HINT,
+        SERVICE_KIND_INSIGHT,
+    )
+except ImportError:
+    OUTPUT_KIND_COPILOT_EXPLANATION = "copilot_explanation"
+    OUTPUT_KIND_INSIGHT_SUMMARY = "insight_summary"
+    ROUTING_SOURCE_COPILOT_AGENT = "copilot_agent"
+    ROUTING_SOURCE_ORCHESTRATOR = "orchestrator"
+    ROUTING_SOURCE_READ_FALLBACK = "read_fallback"
+    ROUTING_SOURCE_UI_HINT = "ui_hint"
+    SERVICE_KIND_INSIGHT = "insight_service"
+
+OUTPUT_KIND_INSIGHT_CHAT_EXPLANATION = "insight_chat_explanation"
+ROUTING_SOURCE_INSIGHT_CHAT_AGENT = "insight_chat_agent"
+
+__all__ = [
+    "OUTPUT_KIND_COPILOT_EXPLANATION",
+    "OUTPUT_KIND_INSIGHT_CHAT_EXPLANATION",
+    "OUTPUT_KIND_INSIGHT_SUMMARY",
+    "ROUTING_SOURCE_COPILOT_AGENT",
+    "ROUTING_SOURCE_INSIGHT_CHAT_AGENT",
+    "ROUTING_SOURCE_ORCHESTRATOR",
+    "ROUTING_SOURCE_READ_FALLBACK",
+    "ROUTING_SOURCE_UI_HINT",
+    "SERVICE_KIND_INSIGHT",
+]

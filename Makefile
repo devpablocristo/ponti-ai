@@ -3,7 +3,9 @@ SHELL := /bin/bash
 UVICORN_PORT ?= 8090
 COMPOSE ?= docker compose
 
-.PHONY: install up down build migrate run test pull-ollama-models smoke smoke-local
+.PHONY: install up down build migrate run test pull-ollama-models llm-up llm-pull smoke smoke-local
+
+LOCAL_INFRA_DIR ?= /home/pablo/Projects/Pablo/local-infra
 
 install:
 	python -m pip install -r requirements.txt
@@ -12,9 +14,10 @@ build:
 	$(COMPOSE) build
 
 up:
+	@$(MAKE) llm-up
+	@$(MAKE) llm-pull
 	$(COMPOSE) up -d --build
 	$(MAKE) migrate
-	$(MAKE) pull-ollama-models
 
 down:
 	$(COMPOSE) down -v --remove-orphans
@@ -23,14 +26,19 @@ migrate:
 	$(COMPOSE) run --rm ai-migrate
 
 run:
-	PYTHONPATH=. uvicorn app.main:create_app --factory --reload --port $(UVICORN_PORT)
+	PYTHONPATH=. uvicorn src.main:create_app --factory --reload --port $(UVICORN_PORT)
 
 test:
 	python -m pip install -r requirements.txt
 	PYTHONPATH=. python -m pytest
 
-pull-ollama-models:
-	$(COMPOSE) exec ollama ollama pull llama3.1
+llm-up:
+	docker compose --project-directory $(LOCAL_INFRA_DIR) -f $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml up -d
+
+llm-pull:
+	$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh gemma4:e4b
+
+pull-ollama-models: llm-pull
 
 smoke:
 	$(COMPOSE) cp scripts/smoke_endpoints.py ponti-ai:/tmp/smoke_endpoints.py

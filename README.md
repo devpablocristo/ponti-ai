@@ -6,8 +6,9 @@ En la taxonomía canónica del ecosistema, Ponti AI combina:
 
 - `InsightService`
 - `CopilotAgent`
+- `Project Advisor`
 
-No expone hoy un `ProductAgent` general, y eso es deliberado.
+No expone un `ProductAgent` horizontal genérico. Expone un asesor de proyecto específico al dominio agrícola y al modelo operativo de Ponti.
 
 ## Endpoints
 
@@ -26,6 +27,12 @@ CopilotAgent (solo si `COPILOT_ENABLED=true`, mismos headers):
 - `GET /v1/copilot/insights/{insight_id}/explain`
 - `GET /v1/copilot/insights/{insight_id}/why`
 - `GET /v1/copilot/insights/{insight_id}/next-steps`
+
+Project Advisor / chat (mismos headers):
+- `POST /v1/chat`
+- `POST /v1/chat/stream`
+- `GET  /v1/chat/conversations`
+- `GET  /v1/chat/conversations/{conversation_id}`
 
 ## Quickstart
 
@@ -133,3 +140,27 @@ Ver `.env.example` para la lista completa de variables y defaults.
 - **LLM**: Stub (local) / Ollama / OpenAI / Google AI Studio
 - **Config**: Pydantic Settings (`env_ignore_empty=True`)
 - **Migraciones**: golang-migrate
+
+
+## Ollama Compartido Local
+
+`ponti-ai` consume el stack compartido de Ollama desde `local-infra/docker-compose.ollama.yml`.
+
+```bash
+docker compose --project-directory /home/pablo/Projects/Pablo/local-infra -f /home/pablo/Projects/Pablo/local-infra/docker-compose.ollama.yml up -d
+/home/pablo/Projects/Pablo/local-infra/scripts/pull-ollama-model.sh gemma4:e4b
+```
+
+Atajos:
+
+```bash
+make llm-up
+make llm-pull
+```
+
+Configuración local:
+
+```env
+LLM_PROVIDER=ollama
+LLM_BASE_URL=http://host.docker.internal:11434
+```
