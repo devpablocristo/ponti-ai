@@ -37,7 +37,7 @@ jobs:
       DEFAULT_LIMIT: "50"
       COPILOT_ENABLED: "true"
       LLM_PROVIDER: "vertex"
-      LLM_MODEL: "gemini-2.0-flash"
+      LLM_MODEL: "gemini-2.5-flash-lite"
       LLM_PROJECT: ${{ vars.GCP_PROJECT_ID_DEV }}
       LLM_LOCATION: "us-central1"
       LLM_TIMEOUT_MS: "5000"
