@@ -1,98 +1,13 @@
-"""Servicio de insight_chat: resolución de snapshots y evidencia para follow-ups."""
+"""Helpers para reusar evidencia de insights ya inyectada en mensajes anteriores
+del mismo chat (follow-ups). El path de resolución contra la DB local quedó muerto
+cuando los insights se movieron a ponti-backend; lo único que sigue vivo es leer
+el `insight_evidence` que el agente haya guardado en mensajes previos."""
 
 from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any, Literal
-
-from pydantic import BaseModel, Field
-
-from src.insights.domain import Insight
-
-
-class InsightEvidenceKPI(BaseModel):
-    label: str
-    value: str
-    unit: str = ""
-    trend: str = ""
-
-
-class InsightEvidenceHighlight(BaseModel):
-    severity: Literal["positive", "info", "warning"]
-    title: str
-    detail: str
-
-
-class InsightEvidence(BaseModel):
-    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff"
-    notification_id: str | None = None
-    insight_id: str | None = None
-    scope: str = ""
-    computed_at: str = ""
-    summary: str = ""
-    kpis: list[InsightEvidenceKPI] = Field(default_factory=list)
-    highlights: list[InsightEvidenceHighlight] = Field(default_factory=list)
-    recommendations: list[str] = Field(default_factory=list)
-    entity_ids: list[str] = Field(default_factory=list)
-
-
-def build_insight_evidence_from_insight(
-    insight: Insight,
-    *,
-    notification_id: str | None = None,
-    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff",
-) -> InsightEvidence:
-    """Construye evidencia de insight a partir de un Insight resuelto."""
-    evidence_data = insight.evidence if isinstance(insight.evidence, dict) else {}
-    action_data = insight.action if isinstance(insight.action, dict) else {}
-
-    kpis: list[InsightEvidenceKPI] = []
-    for key in ("feature", "feature_name"):
-        if evidence_data.get(key):
-            value = evidence_data.get("value", "")
-            kpis.append(InsightEvidenceKPI(
-                label=str(evidence_data[key]),
-                value=str(value),
-                unit=str(evidence_data.get("unit", "")),
-                trend="up" if float(value or 0) > float(evidence_data.get("p75", 0) or 0) else "flat",
-            ))
-            break
-
-    highlights: list[InsightEvidenceHighlight] = []
-    if insight.severity >= 80:
-        highlights.append(InsightEvidenceHighlight(
-            severity="warning",
-            title=insight.title,
-            detail=insight.summary,
-        ))
-    elif insight.severity >= 50:
-        highlights.append(InsightEvidenceHighlight(
-            severity="info",
-            title=insight.title,
-            detail=insight.summary,
-        ))
-
-    recommendations: list[str] = []
-    suggestion = action_data.get("suggestion")
-    if suggestion:
-        recommendations.append(str(suggestion))
-
-    return InsightEvidence(
-        source=source,
-        notification_id=notification_id,
-        insight_id=insight.id,
-        scope=f"{insight.entity_type}:{insight.entity_id}",
-        computed_at=insight.computed_at.isoformat() if insight.computed_at else datetime.now(UTC).isoformat(),
-        summary=insight.summary,
-        kpis=kpis,
-        highlights=highlights,
-        recommendations=recommendations,
-        entity_ids=[insight.entity_id] if insight.entity_id else [],
-    )
-
-
-# --- Extracción y compactación para follow-ups ---
+from typing import Any
 
 _EVIDENCE_TTL_HOURS = 24
 
@@ -146,7 +61,6 @@ def compact_insight_evidence_for_prompt(evidence: dict[str, Any]) -> str:
         compacted["recommendations"] = list(raw_recs)
 
     result = json.dumps(compacted, ensure_ascii=False)
-    # Truncar si es grande
     if len(result) > 2000:
         if "recommendations" in compacted:
             compacted["recommendations"] = compacted["recommendations"][:3]

@@ -115,7 +115,7 @@ async def ponti_assistant_chat(
             llm=container.chat_llm,
             get_summary=container.get_summary,
             repo=repo,
-            repo_insight=container.get_insights.insight_repo,
+            workspace=req.workspace.model_dump(mode="json") if req.workspace else None,
         )
     except ValueError as exc:
         if "conversation_not_found" in str(exc):
@@ -159,7 +159,7 @@ async def ponti_assistant_chat_stream(
             llm=container.chat_llm,
             get_summary=container.get_summary,
             repo=repo,
-            repo_insight=container.get_insights.insight_repo,
+            workspace=req.workspace.model_dump(mode="json") if req.workspace else None,
         ):
             yield f"event: {event.get('event', 'message')}\ndata: {event.get('data', '{}')}\n\n"
 

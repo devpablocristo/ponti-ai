@@ -48,7 +48,6 @@ from src.db.repository import AIRepository
 from src.runtime_contracts import ROUTING_SOURCE_INSIGHT_CHAT_AGENT
 from src.agents.audit import record_agent_event
 from src.agents.insight_chat_service import (
-    build_insight_evidence_from_insight,
     compact_insight_evidence_for_prompt,
     extract_insight_evidence,
 )
@@ -362,6 +361,35 @@ def _build_turn_context(
     )
 
 
+def _build_workspace_context_block(workspace: dict[str, Any] | None) -> str:
+    """Arma un bloque de contexto legible con la selección activa del usuario."""
+    if not workspace:
+        return ""
+    pairs: list[str] = []
+    mapping = [
+        ("Cliente", "customer_name", "customer_id"),
+        ("Proyecto", "project_name", "project_id"),
+        ("Campaña", "campaign_name", "campaign_id"),
+        ("Campo", "field_name", "field_id"),
+    ]
+    for label, name_key, id_key in mapping:
+        name = workspace.get(name_key)
+        ident = workspace.get(id_key)
+        if not name and ident in (None, ""):
+            continue
+        text = str(name) if name else ""
+        if ident not in (None, ""):
+            text = f"{text} (id={ident})" if text else f"id={ident}"
+        pairs.append(f"- {label}: {text}")
+    if not pairs:
+        return ""
+    header = (
+        "Selección activa del usuario en la UI. Usala para acotar resultados "
+        "sin volver a preguntarle; si cambia entre turnos, adaptá la respuesta al nuevo contexto."
+    )
+    return header + "\n" + "\n".join(pairs)
+
+
 async def run_ponti_chat_turn(
     *,
     request_id: str,
@@ -377,7 +405,7 @@ async def run_ponti_chat_turn(
     llm: LLMProvider,
     get_summary,
     repo: AIRepository,
-    repo_insight=None,
+    workspace: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     lang = _resolve_language(preferred_language, accept_language)
     clean = message.strip()
@@ -482,6 +510,9 @@ async def run_ponti_chat_turn(
     )
     context_block = build_project_operating_context_for_prompt(dossier, user_id)
     system = base_system_prompt(settings.domain, backend_tools=backend_ok) + "\n" + route_system_addon(routed)
+    workspace_block = _build_workspace_context_block(workspace)
+    if workspace_block:
+        system += f"\n\n{workspace_block}"
     if context_block:
         system += f"\n\nContexto operativo del proyecto:\n{context_block}"
     if lang == "en":
@@ -545,27 +576,10 @@ async def run_ponti_chat_turn(
     user_msg: dict[str, Any] = {"role": "user", "content": clean, "ts": now_iso}
     if chat_context:
         user_msg["chat_context"] = chat_context
-    # --- Fase 6: resolver insight y construir evidencia si hay handoff ---
+    # Insight-evidence injection desde DB local quedó deprecada cuando los
+    # insights se movieron a ponti-backend. La UI hoy manda el contenido del
+    # insight inline en el primer mensaje del chat, sin pasar insight_id.
     insight_evidence_payload: dict[str, Any] | None = None
-    if decision.handler_kind == "insight_lane" and decision.extras.get("insight_id"):
-        try:
-            insight = await asyncio.to_thread(
-                repo_insight.get_by_id, project_id, str(decision.extras["insight_id"]),
-            ) if repo_insight else None
-            if insight is not None:
-                evidence = build_insight_evidence_from_insight(
-                    insight,
-                    notification_id=decision.extras.get("notification_id"),
-                    source="insight_handoff" if decision.reason == "structured_handoff" else "insight_chat_legacy_match",
-                )
-                insight_evidence_payload = evidence.model_dump(mode="json")
-        except Exception:
-            logger.warning(
-                "ponti_chat_insight_evidence_failed",
-                request_id=request_id,
-                project_id=project_id,
-                insight_id=str(decision.extras.get("insight_id") or ""),
-            )
 
     assistant_msg: dict[str, Any] = {
         "role": "assistant",
@@ -676,7 +690,7 @@ async def iter_ponti_chat_sse(
     llm: LLMProvider,
     get_summary,
     repo: AIRepository,
-    repo_insight=None,
+    workspace: dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     """Misma lógica que run_ponti_chat_turn pero emite SSE.
 
@@ -792,6 +806,9 @@ async def iter_ponti_chat_sse(
     )
     context_block = build_project_operating_context_for_prompt(dossier, user_id)
     system = base_system_prompt(settings.domain, backend_tools=backend_ok) + "\n" + route_system_addon(routed)
+    workspace_block = _build_workspace_context_block(workspace)
+    if workspace_block:
+        system += f"\n\n{workspace_block}"
     if context_block:
         system += f"\n\nContexto operativo del proyecto:\n{context_block}"
     if lang == "en":
@@ -868,27 +885,7 @@ async def iter_ponti_chat_sse(
     if chat_context:
         user_msg["chat_context"] = chat_context
 
-    # --- Fase 6: resolver insight y construir evidencia si hay handoff ---
     insight_evidence_payload: dict[str, Any] | None = None
-    if decision.handler_kind == "insight_lane" and decision.extras.get("insight_id"):
-        try:
-            insight = await asyncio.to_thread(
-                repo_insight.get_by_id, project_id, str(decision.extras["insight_id"]),
-            ) if repo_insight else None
-            if insight is not None:
-                evidence = build_insight_evidence_from_insight(
-                    insight,
-                    notification_id=decision.extras.get("notification_id"),
-                    source="insight_handoff" if decision.reason == "structured_handoff" else "insight_chat_legacy_match",
-                )
-                insight_evidence_payload = evidence.model_dump(mode="json")
-        except Exception:
-            logger.warning(
-                "ponti_chat_stream_insight_evidence_failed",
-                request_id=request_id,
-                project_id=project_id,
-                insight_id=str(decision.extras.get("insight_id") or ""),
-            )
 
     assistant_msg: dict[str, Any] = {
         "role": "assistant",

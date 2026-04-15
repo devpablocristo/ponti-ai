@@ -8,18 +8,13 @@ from typing import Any
 from fastapi import Header, HTTPException, Request, status
 
 from src.config import Settings
-from src.insight_chat.service import ExplainInsight
-from src.insights.service import ComputeInsights, GetInsights, GetSummary, RecordAction
+from src.insights.service import GetSummary
 
 
 @dataclass(frozen=True)
 class AppContainer:
     settings: Settings
-    explain_insight: ExplainInsight
-    compute_insights: ComputeInsights
-    get_insights: GetInsights
     get_summary: GetSummary
-    record_action: RecordAction
     chat_llm: Any
 
 
